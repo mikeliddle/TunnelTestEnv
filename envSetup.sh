@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/bin/bash
 
 InstallPrereqs() {
 	apt update
 	apt remove -y docker
-	apt install -y docker.io openssl
+	apt install -y docker.io
 }
 
 Help() {
@@ -49,6 +49,7 @@ ReplaceNames() {
 
 ConfigureCerts() {
 	# setup PKI folder structure
+	mkdir /etc/pki/tls
 	mkdir /etc/pki/tls/certs
 	mkdir /etc/pki/tls/req
 	mkdir /etc/pki/tls/private
