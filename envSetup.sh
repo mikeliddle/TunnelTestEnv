@@ -16,6 +16,31 @@ Help() {
 	echo "	export SERVER_PUBLIC_IP=20.x.x.x"
 }
 
+Uninstall() {
+	echo "removing docker containers"
+	docker stop untrusted
+	docker stop trusted
+	docker stop letsencrypt
+	docker stop unbound
+	docker stop simpleapp
+
+	docker rm untrusted
+	docker rm trusted
+	docker rm letsencrypt
+	docker rm unbound
+	docker rm simpleapp
+
+	echo "removing docker volumes"
+	docker volume rm nginx-vol
+	docker volume rm unbound
+
+	echo "removing /etc/pki/tls folder"
+	rm -rf /etc/pki/tls
+
+	echo "resetting config files"
+	git reset --hard
+}
+
 VerifyEnvironmentVars() {
 	if [ -z $SERVER_NAME ]; then
 		echo "MISSING SERVER NAME... Aborting."
@@ -75,8 +100,8 @@ ConfigureCerts() {
 	openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
 
 	# generate untrusted leaf cert
-	openssl genrsa -out private/untrusted.key 4096
-	openssl req -new -x509 -days 3650 -extensions req_ext -key private/untrusted.key -out certs/untrusted.pem
+	openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -nodes -out certs/untrusted.pem -keyout private/untrusted.key
+
 
 	cd $current_dir
 	# pop current directory
@@ -165,6 +190,8 @@ BuildAndRunWebService() {
 
 if [[ $1 == "-h" ]]; then
 	Help
+elif [[ $1 == "-r" ]]; then
+	Uninstall
 else
 	if [[ $1 == "-i" ]]; then
 		InstallPrereqs
