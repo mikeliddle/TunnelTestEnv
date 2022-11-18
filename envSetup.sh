@@ -72,7 +72,7 @@ ConfigureCerts() {
 	# generate leaf from our CA
 	openssl genrsa -out private/server.key 4096
 	openssl req -new -key private/server.key -out req/server.csr -config openssl.conf
-	openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem -CAcreateserial -out cert/server.pem -extensions req_ext -extfile openssl.conf
+	openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
 
 	# generate untrusted leaf cert
 	openssl genrsa -out private/untrusted.key 4096
