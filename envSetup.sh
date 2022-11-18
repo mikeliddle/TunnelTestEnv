@@ -98,7 +98,7 @@ ConfigureCerts() {
 	mkdir /etc/pki/tls/private
 	
 	# copy config into the tls folder structure
-	cp openssl.conf.d/openssl.conf /etc/pki/tls
+	cp openssl.conf.d/* /etc/pki/tls
 
 	# push current directory
 	current_dir=$(pwd)
@@ -107,7 +107,7 @@ ConfigureCerts() {
 
 	# generate self-signed root CA
 	openssl genrsa -out private/cakey.pem 4096
-	openssl req -new -x509 -days 3650 -extensions v3_ca -key private/cakey.pem -out certs/cacert.pem
+	openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem -out certs/cacert.pem 
 
 	# generate leaf from our CA
 	openssl genrsa -out private/server.key 4096
@@ -115,7 +115,7 @@ ConfigureCerts() {
 	openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
 
 	# generate untrusted leaf cert
-	openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -nodes -out certs/untrusted.pem -keyout private/untrusted.key
+	openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out certs/untrusted.pem -keyout private/untrusted.key
 
 
 	cd $current_dir
