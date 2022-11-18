@@ -2,9 +2,15 @@
 
 InstallPrereqs() {
 	echo "installing Docker"
-	apt update > run.log
-	apt remove -y docker >> run.log
-	apt install -y docker.io >> run.log
+	apt update > run.log 2>&1
+	apt remove -y docker >>  run.log 2>&1
+	apt install -y docker.io >> run.log 2>&1
+
+	echo "installing ACME certbot"
+	snap install core
+	snap refresh core
+	snap install --classic certbot
+	ln -s /snap/bin/certbot /usr/bin/certbot
 
 	echo "disabling resolved.service"
 	sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
@@ -114,6 +120,10 @@ ConfigureCerts() {
 	# generate untrusted leaf cert
 	openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out certs/untrusted.pem -keyout private/untrusted.key
 
+	certbot certonly --standalone
+
+	cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem certs/letsencrypt.pem
+	cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem private/letsencrypt.key
 
 	cd $current_dir
 	# pop current directory
