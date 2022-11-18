@@ -188,13 +188,19 @@ ConfigureNginx() {
 ###########################################################################################
 
 BuildAndRunWebService() {
-	docker build -t sampleWebService sampleWebService
+	current_dir=$(pwd)
+
+	cd sampleWebService
+
+	docker build -t sampleWebService .
 
 	docker run -d \
 		--name=webService \
 		--restart=unless-stopped \
-		-p 7152:7152
+		-p 80:80
 		sampleWebService
+
+	cd $current_dir
 }
 
 if [[ $1 == "-h" ]]; then
