@@ -1,0 +1,7 @@
+FROM mcr.microsoft.com/dotnet/aspnet:6.0
+Copy .* /app
+RUN dotnet restore
+WORKDIR /app
+EXPOSE 7152
+ENTRYPOINT [ "dotnet" ]
+CMD [ "run" ]
