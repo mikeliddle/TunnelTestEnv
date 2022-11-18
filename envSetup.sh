@@ -1,9 +1,10 @@
 #!/bin/bash
 
 InstallPrereqs() {
-	apt update
-	apt remove -y docker
-	apt install -y docker.io
+	echo "installing Docker"
+	apt update > run.log
+	apt remove -y docker >> run.log
+	apt install -y docker.io >> run.log
 }
 
 Help() {
@@ -35,6 +36,8 @@ VerifyEnvironmentVars() {
 }
 
 ReplaceNames() {
+	echo "Injecting Environment variables"
+
 	sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
 	sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
 	sed -i "s/##SERVER_PRIVATE_IP##/${SERVER_PRIVATE_IP}/g" *.d/*.conf
@@ -63,7 +66,7 @@ ConfigureCerts() {
 	cd /etc/pki/tls
 
 	# generate self-signed root CA
-	opensl genrsa -out private/cakey.pem 4096
+	openssl genrsa -out private/cakey.pem 4096
 	openssl req -new -x509 -days 3650 -extensions v3_ca -key private/cakey.pem -out certs/cacert.pem
 
 	# generate leaf from our CA
