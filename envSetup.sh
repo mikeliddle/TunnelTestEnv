@@ -133,6 +133,14 @@ ConfigureNginx() {
 		--restart=unless-stopped \
 		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/letsencrypt.conf:/etc/nginx/nginx.conf:ro \
 		nginx
+
+	docker run -d \
+		--name=simpleapp \
+		--mount source=nginx-vol,destination=/etc/volume \
+		-p 443:443 \
+		--restart=unless-stopped \
+		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/spa.conf:/etc/nginx/nginx.conf:ro \
+		nginx
 }
 
 ###########################################################################################
