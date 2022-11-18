@@ -5,6 +5,12 @@ InstallPrereqs() {
 	apt update > run.log
 	apt remove -y docker >> run.log
 	apt install -y docker.io >> run.log
+
+	echo "disabling resolved.service"
+	sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
+	sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
+	ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+	systemctl stop systemd-resolved
 }
 
 Help() {
@@ -19,15 +25,18 @@ Help() {
 Uninstall() {
 	echo "removing docker containers"
 	docker stop untrusted
-	docker stop trusted
-	docker stop letsencrypt
-	docker stop unbound
-	docker stop simpleapp
-
 	docker rm untrusted
+	
+	docker stop trusted
 	docker rm trusted
+	
+	docker stop letsencrypt
 	docker rm letsencrypt
+	
+	docker stop unbound
 	docker rm unbound
+
+	docker stop simpleapp	
 	docker rm simpleapp
 
 	echo "removing docker volumes"
@@ -39,6 +48,12 @@ Uninstall() {
 
 	echo "resetting config files"
 	git reset --hard
+
+	echo "enabling resolved"
+	sed -i "s/DNS=1.1.1.1/#DNS=/g" /etc/systemd/resolved.conf
+	sed -i "s/DNSStubListener=no/#DNSStubListener=yes/g" /etc/systemd/resolved.conf
+	rm /etc/resolv.conf
+	systemctl restart systemd-resolved
 }
 
 VerifyEnvironmentVars() {
