@@ -39,6 +39,9 @@ Uninstall() {
 	docker stop simpleapp	
 	docker rm simpleapp
 
+	docker stop webService
+	docker rm webService
+
 	echo "removing docker volumes"
 	docker volume rm nginx-vol
 	docker volume rm unbound
@@ -192,13 +195,13 @@ BuildAndRunWebService() {
 
 	cd sampleWebService
 
-	docker build -t sampleWebService .
+	docker build -t samplewebservice .
 
 	docker run -d \
 		--name=webService \
 		--restart=unless-stopped \
-		-p 80:80
-		sampleWebService
+		-p 80:80 \
+		samplewebservice
 
 	cd $current_dir
 }
@@ -220,5 +223,5 @@ else
 	ConfigureUnbound
 	ConfigureNginx
 	BuildAndRunWebService
-	BuildAndRunSPA
+	# BuildAndRunSPA
 fi
