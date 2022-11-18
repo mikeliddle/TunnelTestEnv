@@ -48,12 +48,6 @@ Uninstall() {
 
 	echo "resetting config files"
 	git reset --hard
-
-	echo "enabling resolved"
-	sed -i "s/DNS=1.1.1.1/#DNS=/g" /etc/systemd/resolved.conf
-	sed -i "s/DNSStubListener=no/#DNSStubListener=yes/g" /etc/systemd/resolved.conf
-	rm /etc/resolv.conf
-	systemctl restart systemd-resolved
 }
 
 VerifyEnvironmentVars() {
