@@ -6,11 +6,13 @@ InstallPrereqs() {
     apt remove -y docker >>  run.log 2>&1
     apt install -y docker.io >> run.log 2>&1
 
-    echo "installing ACME certbot"
-    snap install core
-    snap refresh core
-    snap install --classic certbot
-    ln -s /snap/bin/certbot /usr/bin/certbot
+    if [[ !$SKIP_LETS_ENCRYPT ]]; then
+        echo "installing ACME certbot"
+        snap install core
+        snap refresh core
+        snap install --classic certbot
+        ln -s /snap/bin/certbot /usr/bin/certbot
+    fi
 
     echo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
@@ -20,12 +22,25 @@ InstallPrereqs() {
 }
 
 Help() {
-    echo "before running, set the following environment variables:"
-
+    echo "Usage: sudo ./envSetup.sh [-i|-h|-r]"
+    echo "  -i : install pre-reqs before configuring and setting up the environment"
+    echo "  -r : remove the configuration. Doesn't uninstall pre-reqs or undo steps to deisable systemd-resolved"
+    echo "  -h : print out this help and usage message :)"
+    echo ""
+    echo "Note: this command needs root for installation commands, for running docker commands, "
+    echo "      and for editing files/folders at /etc/pki and /var/lib/docker/volumes. Alternatively, "
+    echo "      you could create a user with permissions to run these commands and run this script as "
+    echo "      that user instead."
+    echo ""
+    echo "Before running, set the following environment variables:"
     echo "	export SERVER_NAME=example"
     echo "	export DOMAIN_NAME=example.com"
     echo "	export SERVER_PRIVATE_IP=10.x.x.x"
     echo "	export SERVER_PUBLIC_IP=20.x.x.x"
+    echo ""
+    echo "Optional"
+    echo "  export SKIP_LETS_ENCRYPT=1 - to skip the letsencrypt automation steps"
+    echo "  export SKIP_CERT_GENERATION=1 - to skip generating new PKI certs"
 }
 
 Uninstall() {
@@ -54,9 +69,6 @@ Uninstall() {
 
     echo "removing /etc/pki/tls folder"
     rm -rf /etc/pki/tls
-
-    echo "resetting config files"
-    git reset --hard
 }
 
 VerifyEnvironmentVars() {
@@ -94,6 +106,9 @@ ReplaceNames() {
 ###########################################################################################
 
 ConfigureCerts() {
+    # push current directory
+    current_dir=$(pwd)
+
     # setup PKI folder structure
     mkdir /etc/pki/tls
     mkdir /etc/pki/tls/certs
@@ -103,29 +118,32 @@ ConfigureCerts() {
     # copy config into the tls folder structure
     cp openssl.conf.d/* /etc/pki/tls
 
-    # push current directory
-    current_dir=$(pwd)
-
     cd /etc/pki/tls
 
     # generate self-signed root CA
     openssl genrsa -out private/cakey.pem 4096
-    openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem -out certs/cacert.pem 
+    openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
+        -out certs/cacert.pem 
 
     # generate leaf from our CA
     openssl genrsa -out private/server.key 4096
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf
-    openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
+    openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+        -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
 
     # generate untrusted leaf cert
-    openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out certs/untrusted.pem -keyout private/untrusted.key
+    openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out \
+        certs/untrusted.pem -keyout private/untrusted.key
 
-    certbot certonly --standalone
+    if [[ !$SKIP_LETS_ENCRYPT ]]; then
+        certbot certonly --standalone
 
-    cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem certs/letsencrypt.pem
-    cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem private/letsencrypt.key
+        cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem certs/letsencrypt.pem
+        cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem private/letsencrypt.key
 
-    openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key -in certs/letsencrypt.pem -nodes -password pass:
+        openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
+            -in certs/letsencrypt.pem -nodes -password pass:
+    fi
 
     cd $current_dir
     # pop current directory
@@ -159,8 +177,6 @@ ConfigureNginx() {
     cp -r /etc/pki/tls/certs /var/lib/docker/volumes/nginx-vol/_data/certs
     cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
     cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
-
-    # TODO: missing letsencrypt cert.
 
     # run the containers
     docker run -d \
@@ -216,6 +232,12 @@ BuildAndRunWebService() {
     cd $current_dir
 }
 
+###########################################################################################
+#                                                                                         #
+#                                          Main()                                         #
+#                                                                                         #
+###########################################################################################
+
 if [[ $1 == "-h" ]]; then
     Help
 elif [[ $1 == "-r" ]]; then
@@ -229,9 +251,11 @@ else
     VerifyEnvironmentVars
     ReplaceNames
 
-    ConfigureCerts
+    if [[ !$SKIP_CERT_GENERATION ]]; then
+        ConfigureCerts
+    fi
+
     ConfigureUnbound
     ConfigureNginx
     BuildAndRunWebService
-    # BuildAndRunSPA
 fi
