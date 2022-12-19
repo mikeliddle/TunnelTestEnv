@@ -163,7 +163,7 @@ ConfigureUnbound() {
         mvance/unbound:latest
 
     # copy in necessary config files
-    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-record.conf
+    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     # restart to apply config change
     docker restart unbound
 }
