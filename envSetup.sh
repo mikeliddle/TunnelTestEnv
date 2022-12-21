@@ -72,21 +72,29 @@ Uninstall() {
 }
 
 VerifyEnvironmentVars() {
-    if [ -z $SERVER_NAME ]; then
-        echo "MISSING SERVER NAME... Aborting."
-        exit
-    fi
+
     if [ -z $DOMAIN_NAME ]; then
-        echo "MISSING DOMAIN NAME... Aborting."
-        exit
+    read -p "Enter the fqdn of the server : " DOMAIN_NAME
     fi
+
+    if [ -z $SERVER_NAME ]; then
+        read -p "Enter the hostname of the server : " SERVER_NAME
+    fi
+
     if [ -z $SERVER_PRIVATE_IP ]; then
-        echo "MISSING PRIVATE IP... Aborting."
-        exit
+        read -p "Enter the private(local) IP address of the server : " SERVER_PRIVATE_IP
     fi
+
     if [ -z $SERVER_PUBLIC_IP ]; then
-        echo "MISSING PUBLIC IP... Aborting."
-        exit
+        read -p "Enter the public IP address of the server : " SERVER_PUBLIC_IP
+    fi
+
+    if [ -z $TUNNEL_HOSTNAME ]; then
+        read -p "Enter the public IP address of the server : " TUNNEL_HOSTNAME
+    fi
+
+    if [ -z $TUNNEL_DOMAINNAME ]; then
+        read -p "Enter the public IP address of the server : " TUNNEL_DOMAINNAME
     fi
 }
 
@@ -97,6 +105,8 @@ ReplaceNames() {
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PRIVATE_IP##/${SERVER_PRIVATE_IP}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
+    sed -i "s/##TUNNEL_DOMAINNAME##/${TUNNEL_DOMAINNAME}/g" *.d/*.conf
+    sed -i "s/##TUNNEL_HOSTNAME##/${TUNNEL_HOSTNAME}/g" *.d/*.conf
 }
 
 ###########################################################################################
@@ -105,49 +115,7 @@ ReplaceNames() {
 #                                                                                         #
 ###########################################################################################
 
-ConfigureCerts() {
-    # push current directory
-    current_dir=$(pwd)
 
-    # setup PKI folder structure
-    mkdir /etc/pki/tls
-    mkdir /etc/pki/tls/certs
-    mkdir /etc/pki/tls/req
-    mkdir /etc/pki/tls/private
-    
-    # copy config into the tls folder structure
-    cp openssl.conf.d/* /etc/pki/tls
-
-    cd /etc/pki/tls
-
-    # generate self-signed root CA
-    openssl genrsa -out private/cakey.pem 4096
-    openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
-        -out certs/cacert.pem 
-
-    # generate leaf from our CA
-    openssl genrsa -out private/server.key 4096
-    openssl req -new -key private/server.key -out req/server.csr -config openssl.conf
-    openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
-        -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
-
-    # generate untrusted leaf cert
-    openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out \
-        certs/untrusted.pem -keyout private/untrusted.key
-
-    if [[ !$SKIP_LETS_ENCRYPT ]]; then
-        certbot certonly --standalone
-
-        cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem certs/letsencrypt.pem
-        cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem private/letsencrypt.key
-
-        openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
-            -in certs/letsencrypt.pem -nodes -password pass:
-    fi
-
-    cd $current_dir
-    # pop current directory
-}
 
 ConfigureUnbound() {
     # create the unbound volume
@@ -230,6 +198,17 @@ BuildAndRunWebService() {
         samplewebservice
 
     cd $current_dir
+}
+
+###########################################################################################
+#                                                                                         #
+#                                    Cert Generation                                      #
+#                                                                                         #
+###########################################################################################
+
+ConfigureCerts() {
+    ./scripts/generateCerts.sh
+    PKI_ROOT="/etc/pki/tunnel" && DOMAIN_NAME=$TUNNEL_DOMAINNAME && SERVER_NAME=$TUNNEL_HOSTNAME && SKIP_LETS_ENCRYPT=1 ./scripts/generateCerts.sh 
 }
 
 ###########################################################################################
