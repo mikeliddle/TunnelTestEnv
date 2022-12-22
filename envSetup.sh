@@ -5,6 +5,7 @@ InstallPrereqs() {
     apt update > run.log 2>&1
     apt remove -y docker >>  run.log 2>&1
     apt install -y docker.io >> run.log 2>&1
+    apt install -y jq >> run.log 2>&1
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
         echo "installing ACME certbot"
@@ -104,8 +105,6 @@ ReplaceNames() {
 #                           Simple Env Setup with Docker                                  #
 #                                                                                         #
 ###########################################################################################
-
-
 
 ConfigureUnbound() {
     # create the unbound volume
