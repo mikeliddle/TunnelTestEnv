@@ -88,14 +88,6 @@ VerifyEnvironmentVars() {
     if [ -z $SERVER_PUBLIC_IP ]; then
         read -p "Enter the public IP address of the server : " SERVER_PUBLIC_IP
     fi
-
-    if [ -z $TUNNEL_HOSTNAME ]; then
-        read -p "Enter the public IP address of the server : " TUNNEL_HOSTNAME
-    fi
-
-    if [ -z $TUNNEL_DOMAINNAME ]; then
-        read -p "Enter the public IP address of the server : " TUNNEL_DOMAINNAME
-    fi
 }
 
 ReplaceNames() {
@@ -105,8 +97,6 @@ ReplaceNames() {
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PRIVATE_IP##/${SERVER_PRIVATE_IP}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
-    sed -i "s/##TUNNEL_DOMAINNAME##/${TUNNEL_DOMAINNAME}/g" *.d/*.conf
-    sed -i "s/##TUNNEL_HOSTNAME##/${TUNNEL_HOSTNAME}/g" *.d/*.conf
 }
 
 ###########################################################################################
@@ -158,7 +148,7 @@ ConfigureNginx() {
     docker run -d \
         --name=untrusted \
         --mount source=nginx-vol,destination=/etc/volume \
-        -p 8443:8443 \
+        -p 8080:8080 \
         --restart=unless-stopped \
         -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/untrusted.conf:/etc/nginx/nginx.conf:ro \
         nginx
@@ -166,7 +156,7 @@ ConfigureNginx() {
     docker run -d \
         --name=letsencrypt \
         --mount source=nginx-vol,destination=/etc/volume \
-        -p 8080:8080 \
+        -p 8443:8443 \
         --restart=unless-stopped \
         -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/letsencrypt.conf:/etc/nginx/nginx.conf:ro \
         nginx
@@ -188,10 +178,10 @@ BuildAndRunWebService() {
     docker run -d \
         --name=webService \
         --restart=unless-stopped \
-        -p 80:80 \
-        -p 443:443 \
+        -p 8880:80 \
+        -p 7443:7443 \
         -e ASPNETCORE_URLS="https://+;http://+" \
-        -e ASPNETCORE_HTTPS_PORT=443 \
+        -e ASPNETCORE_HTTPS_PORT=7443 \
         -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
         -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/letsencrypt.pfx \
         -v /etc/pki/tls/private/letsencrypt.pfx:/https/letsencrypt.pfx \
@@ -208,7 +198,7 @@ BuildAndRunWebService() {
 
 ConfigureCerts() {
     ./scripts/generateCerts.sh
-    PKI_ROOT="/etc/pki/tunnel" && DOMAIN_NAME=$TUNNEL_DOMAINNAME && SERVER_NAME=$TUNNEL_HOSTNAME && SKIP_LETS_ENCRYPT=1 ./scripts/generateCerts.sh 
+    PKI_ROOT="/etc/pki/tunnel" && SKIP_LETS_ENCRYPT=1 ./scripts/generateCerts.sh 
 }
 
 ###########################################################################################
