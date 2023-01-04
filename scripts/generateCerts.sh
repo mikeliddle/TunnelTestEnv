@@ -47,3 +47,5 @@ ConfigureCerts() {
 if [ -z $PKI_ROOT ]; then
     PKI_ROOT=/etc/pki/tls
 fi
+
+ConfigureCerts

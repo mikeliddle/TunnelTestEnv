@@ -3,7 +3,7 @@
 echo "downloading readiness script"
 wget --output-document=mst-readiness https://aka.ms/microsofttunnelready
 chmod +x mst-readiness
-./mst-readiness
+./mst-readiness network
 
 if [[$? == 0]]; then
     echo "downloading mstunnel-setup"
