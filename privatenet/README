@@ -1,0 +1,27 @@
+Description:
+------------
+The script "run.sh" creates the following private network:
+1- Bind9 DNS caching server with one private zone. You can edit RESOURCE_NAME and ZONE_NAME in the vars file to change the zone name to something else.
+    The default zone name is contoso.udc.
+2- Nginx web server with a single html page. The web server also hosts a PAC script file.
+3- Squid proxy server that blocks all destinations except for what's allowed.
+    You can edit PROXY_ALLOWED_NAMES and PROXY_BYPASS_NAMES in the vars file to allow or deny other destinations.
+
+Requirements:
+-------------
+1- Tunnel server installation
+2- docker
+3- jq
+
+If you have a valid Tunnel server installation then all the above requirements are met and you can create the private net immediately.
+
+How to use:
+-----------
+1- Copy the directory privatenet to the host of Tunnel Server.
+2- To create the private network, on the Tunnel server run:
+    # chmod +x *.sh
+    # ./run.sh
+3- The script will output private DNS server and proxy server information to configure Tunnel Server and VPN profiles.
+4- When no longer needed, on the Tunnel server run:
+    # ./clean.sh
+5- You can edit any files under the remote directory privatenet and run ./run.sh again. Always clean before creating the network again.

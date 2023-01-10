@@ -135,29 +135,12 @@ ConfigureNginx() {
     cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
     cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
 
-    # run the containers
+    # run the container with multiple servers
     docker run -d \
-        --name=trusted \
+        --name=nginx_rp \
         --mount source=nginx-vol,destination=/etc/volume \
-        -p 9443:9443 \
         --restart=unless-stopped \
         -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/trusted.conf:/etc/nginx/nginx.conf:ro \
-        nginx
-
-    docker run -d \
-        --name=untrusted \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 8080:8080 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/untrusted.conf:/etc/nginx/nginx.conf:ro \
-        nginx
-
-    docker run -d \
-        --name=letsencrypt \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 8443:8443 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/letsencrypt.conf:/etc/nginx/nginx.conf:ro \
         nginx
 }
 

@@ -1,0 +1,17 @@
+;
+; BIND reverse data file for ZONE_NAME
+;
+$TTL   0
+@      IN      SOA     ZONE_NAME. root.ZONE_NAME. (
+                              2         ; Serial
+                          43200         ; Refresh
+                            180         ; Retry
+                        2419200         ; Expire
+                              0 )       ; Negative Cache TTL
+;
+
+@    IN    NS    ns.ZONE_NAME.
+BIND9_IP_OCTET    IN    PTR    ns.ZONE_NAME.
+RESOURCE_IP_OCTET    IN    PTR    ZONE_NAME.
+RESOURCE_IP_OCTET    IN    PTR    RESOURCE_ALIAS.ZONE_NAME.
+PROXY_IP_OCTET    IN    PTR    PROXY_NAME.ZONE_NAME.

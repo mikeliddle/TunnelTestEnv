@@ -1,0 +1,17 @@
+;
+; BIND data file for ZONE_NAME
+;
+$TTL   0
+@      IN      SOA     ZONE_NAME. root.ZONE_NAME. (
+                              2         ; Serial
+                          43200         ; Refresh
+                            180         ; Retry
+                        2419200         ; Expire
+                              0 )       ; Negative Cache TTL
+;
+
+@    IN    NS    ns.ZONE_NAME.
+@    IN    A    RESOURCE_IP
+ns    IN    A    BIND9_IP
+RESOURCE_ALIAS    IN    A    RESOURCE_IP
+PROXY_NAME    IN    A    PROXY_IP
