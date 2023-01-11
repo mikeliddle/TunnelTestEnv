@@ -32,11 +32,11 @@ Help() {
     echo "      you could create a user with permissions to run these commands and run this script as "
     echo "      that user instead."
     echo ""
-    echo "Before running, set the following environment variables:"
-    echo "	export SERVER_NAME=example"
-    echo "	export DOMAIN_NAME=example.com"
-    echo "	export SERVER_PRIVATE_IP=10.x.x.x"
-    echo "	export SERVER_PUBLIC_IP=20.x.x.x"
+    echo "Before running, set the following environment variables in the file 'vars':"
+    echo "	SERVER_NAME=example"
+    echo "	DOMAIN_NAME=example.com"
+    echo "	SERVER_PRIVATE_IP=10.x.x.x"
+    echo "	SERVER_PUBLIC_IP=20.x.x.x"
     echo ""
     echo "Optional"
     echo "  export SKIP_LETS_ENCRYPT=1 - to skip the letsencrypt automation steps"
@@ -45,15 +45,9 @@ Help() {
 
 Uninstall() {
     echo "removing docker containers"
-    docker stop untrusted
-    docker rm untrusted
-    
-    docker stop trusted
-    docker rm trusted
-    
-    docker stop letsencrypt
-    docker rm letsencrypt
-    
+	docker stop nginx
+	docker rm nginx
+
     docker stop unbound
     docker rm unbound
 
@@ -178,30 +172,14 @@ ConfigureNginx() {
     cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
     cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
 
-    # run the containers
-    docker run -d \
-        --name=trusted \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 9443:9443 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/trusted.conf:/etc/nginx/nginx.conf:ro \
-        nginx
-
-    docker run -d \
-        --name=untrusted \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 8443:8443 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/untrusted.conf:/etc/nginx/nginx.conf:ro \
-        nginx
-
-    docker run -d \
-        --name=letsencrypt \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 8080:8080 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/letsencrypt.conf:/etc/nginx/nginx.conf:ro \
-        nginx
+	# run the containers
+	docker run -d \
+		--name=nginx \
+		--mount source=nginx-vol,destination=/etc/volume \
+		-p 443:443 \
+		--restart=unless-stopped \
+		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
+		nginx
 }
 
 ###########################################################################################
@@ -221,12 +199,6 @@ BuildAndRunWebService() {
         --name=webService \
         --restart=unless-stopped \
         -p 80:80 \
-        -p 443:443 \
-        -e ASPNETCORE_URLS="https://+;http://+" \
-        -e ASPNETCORE_HTTPS_PORT=443 \
-        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
-        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/letsencrypt.pfx \
-        -v /etc/pki/tls/private/letsencrypt.pfx:/https/letsencrypt.pfx \
         samplewebservice
 
     cd $current_dir
