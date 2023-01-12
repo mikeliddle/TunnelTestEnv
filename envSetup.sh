@@ -215,6 +215,7 @@ BuildAndRunProxy() {
 
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
+    sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     docker restart unbound
 
@@ -245,8 +246,7 @@ BuildAndRunWebService() {
     cd $current_dir
 
     WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
-    sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
-    sed -i "s/# local-data/local-data/g" *.d/*.conf
+    sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" unbound.conf.d/a-records.conf
 }
 
 
