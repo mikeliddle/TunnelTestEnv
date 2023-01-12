@@ -214,6 +214,8 @@ BuildAndRunProxy() {
             ubuntu:squid
 
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+    sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
+    docker restart unbound
 
     docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
     docker cp proxy/etc/squid/allowlist proxy:/etc/squid/allowlist
@@ -272,7 +274,6 @@ else
 
     BuildAndRunWebService
     ConfigureNginx
-    BuildAndRunProxy
-
     ConfigureUnbound
+    BuildAndRunProxy
 fi  
