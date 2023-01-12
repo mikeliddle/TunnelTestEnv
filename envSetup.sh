@@ -6,19 +6,17 @@ InstallPrereqs() {
     apt remove -y docker >>  run.log 2>&1
     apt install -y docker.io >> run.log 2>&1
 
-    if [[ !$SKIP_LETS_ENCRYPT ]]; then
-        echo "installing ACME certbot"
-        snap install core
-        snap refresh core
-        snap install --classic certbot
-        ln -s /snap/bin/certbot /usr/bin/certbot
-    fi
-
     echo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
     ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
     systemctl stop systemd-resolved
+
+	cd acme.sh
+
+	./acme.sh --install -m $EMAIL
+	
+	cd ..
 }
 
 Help() {
@@ -32,11 +30,11 @@ Help() {
     echo "      you could create a user with permissions to run these commands and run this script as "
     echo "      that user instead."
     echo ""
-    echo "Before running, set the following environment variables:"
-    echo "	export SERVER_NAME=example"
-    echo "	export DOMAIN_NAME=example.com"
-    echo "	export SERVER_PRIVATE_IP=10.x.x.x"
-    echo "	export SERVER_PUBLIC_IP=20.x.x.x"
+    echo "Before running, set the following environment variables in the file 'vars':"
+    echo "	SERVER_NAME=example"
+    echo "	DOMAIN_NAME=example.com"
+    echo "	SERVER_PRIVATE_IP=10.x.x.x"
+    echo "	SERVER_PUBLIC_IP=20.x.x.x"
     echo ""
     echo "Optional"
     echo "  export SKIP_LETS_ENCRYPT=1 - to skip the letsencrypt automation steps"
@@ -45,20 +43,11 @@ Help() {
 
 Uninstall() {
     echo "removing docker containers"
-    docker stop untrusted
-    docker rm untrusted
-    
-    docker stop trusted
-    docker rm trusted
-    
-    docker stop letsencrypt
-    docker rm letsencrypt
-    
+	docker stop nginx
+	docker rm nginx
+
     docker stop unbound
     docker rm unbound
-
-    docker stop simpleapp	
-    docker rm simpleapp
 
     docker stop webService
     docker rm webService
@@ -136,13 +125,16 @@ ConfigureCerts() {
         certs/untrusted.pem -keyout private/untrusted.key
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
-        certbot certonly --standalone
+		/root/.acme.sh/acme.sh --upgrade
+		/root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
+		/root/.acme.sh/acme.sh --register-account
 
-        cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem certs/letsencrypt.pem
-        cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem private/letsencrypt.key
+		/root/.acme.sh/acme.sh --upgrade --update-account --accountemail $EMAIL
 
-        openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
-            -in certs/letsencrypt.pem -nodes -password pass:
+		/root/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"
+
+		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem
+		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key
     fi
 
     cd $current_dir
@@ -178,30 +170,14 @@ ConfigureNginx() {
     cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
     cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
 
-    # run the containers
-    docker run -d \
-        --name=trusted \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 9443:9443 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/trusted.conf:/etc/nginx/nginx.conf:ro \
-        nginx
-
-    docker run -d \
-        --name=untrusted \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 8443:8443 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/untrusted.conf:/etc/nginx/nginx.conf:ro \
-        nginx
-
-    docker run -d \
-        --name=letsencrypt \
-        --mount source=nginx-vol,destination=/etc/volume \
-        -p 8080:8080 \
-        --restart=unless-stopped \
-        -v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/letsencrypt.conf:/etc/nginx/nginx.conf:ro \
-        nginx
+	# run the containers
+	docker run -d \
+		--name=nginx \
+		--mount source=nginx-vol,destination=/etc/volume \
+		-p 443:443 \
+		--restart=unless-stopped \
+		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
+		nginx
 }
 
 ###########################################################################################
@@ -221,12 +197,6 @@ BuildAndRunWebService() {
         --name=webService \
         --restart=unless-stopped \
         -p 80:80 \
-        -p 443:443 \
-        -e ASPNETCORE_URLS="https://+;http://+" \
-        -e ASPNETCORE_HTTPS_PORT=443 \
-        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
-        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/letsencrypt.pfx \
-        -v /etc/pki/tls/private/letsencrypt.pfx:/https/letsencrypt.pfx \
         samplewebservice
 
     cd $current_dir
@@ -238,15 +208,16 @@ BuildAndRunWebService() {
 #                                                                                         #
 ###########################################################################################
 
+. vars
+
 if [[ $1 == "-h" ]]; then
     Help
 elif [[ $1 == "-r" ]]; then
     Uninstall
 else
-    if [[ $1 == "-i" ]]; then
-        InstallPrereqs
-    fi
-
+	if [[ $1 == "-i" ]]; then
+		InstallPrereqs
+	fi
     # setup server name
     VerifyEnvironmentVars
     ReplaceNames

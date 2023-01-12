@@ -16,5 +16,4 @@
 
 # Known limitations
 
-* I haven't had time to configure the certbot commands without some interaction, so you may want to obtain this cert out of this process and place it at /etc/pki/tls/certs/letsencrypt.pem and /etc/pki/tls/private/letsencrypt.key before running this script and set the environment variable "SKIP_CERT_GENERATION" to 1.
 * This does not configure the firewall on the VM, so you may have additional work to allow the ports used by this environment
