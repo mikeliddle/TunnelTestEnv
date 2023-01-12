@@ -141,6 +141,9 @@ ConfigureCerts() {
 
 		/root/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"
 
+		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem
+		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key
+
         openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
             -in certs/letsencrypt.pem -nodes -password pass:
     fi
