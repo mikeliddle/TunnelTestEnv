@@ -36,6 +36,8 @@ Help() {
     echo "	SERVER_PRIVATE_IP=10.x.x.x"
     echo "	SERVER_PUBLIC_IP=20.x.x.x"
     echo ""
+    echo "  EMAIL=example@example.com"
+    echo ""
     echo "Optional"
     echo "  export SKIP_LETS_ENCRYPT=1 - to skip the letsencrypt automation steps"
     echo "  export SKIP_CERT_GENERATION=1 - to skip generating new PKI certs"
@@ -51,6 +53,9 @@ Uninstall() {
 
     docker stop webService
     docker rm webService
+
+    docker stop proxy
+    docker rm proxy
 
     echo "removing docker volumes"
     docker volume rm nginx-vol
@@ -158,6 +163,8 @@ ConfigureUnbound() {
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     # restart to apply config change
     docker restart unbound
+
+    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
 }
 
 ConfigureNginx() {
@@ -170,14 +177,51 @@ ConfigureNginx() {
     cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
     cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
 
-	# run the containers
+	# run the containers on the docker subnet
 	docker run -d \
 		--name=nginx \
 		--mount source=nginx-vol,destination=/etc/volume \
-		-p 443:443 \
 		--restart=unless-stopped \
 		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
 		nginx
+
+    NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
+}
+
+BuildAndRunProxy() {
+    PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
+
+    sed -i -e "s/\bPROXY_HOST_NAME\b/proxy/g" nginx_data/tunnel.pac
+    sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
+    for pan in "${PROXY_BYPASS_NAMES[@]}"; do
+        panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
+        sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
+    done
+
+    sed -i -e "s#\bTUNNEL_CLIENT_SUBNET\b#$TUNNEL_CLIENT_SUBNET#g" proxy/etc/squid/squid.conf
+    sed -i -e "s/\bPROXY_PORT\b/3128/g" proxy/etc/squid/squid.conf
+    for pan in "${PROXY_ALLOWED_NAMES[@]}"; do
+        echo "$pan" >> proxy/etc/squid/allowlist
+    done
+    docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile 
+    docker run -d \
+            --name proxy \
+            --restart always \
+            --volume /etc/squid \
+            --dns "$UNBOUND_IP" \
+            --dns-search "$DOMAIN_NAME" \
+            ubuntu:squid
+
+    PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+    sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
+    sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
+    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
+    docker restart unbound
+
+    docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
+    docker cp proxy/etc/squid/allowlist proxy:/etc/squid/allowlist
+    docker restart proxy
 }
 
 ###########################################################################################
@@ -200,8 +244,22 @@ BuildAndRunWebService() {
         samplewebservice
 
     cd $current_dir
+
+    WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 }
 
+
+PrintConf() {
+    echo "=================== Use the following to configure Microsoft Tunnel Server ======================="
+    echo "DNS server: $UNBOUND_IP"
+    echo "Proxy server names: $PROXY_IP proxy.$DOMAIN_NAME"
+    echo "Proxy server port: 3128"
+    echo "PAC URL: http://$DOMAIN_NAME/tunnel.pac"
+    echo "Proxy bypassed names: ${PROXY_BYPASS_NAMES[*]}"
+    echo "Proxy allowed names: ${PROXY_ALLOWED_NAMES[*]}"
+    echo "=================================================================================================="
+}
 ###########################################################################################
 #                                                                                         #
 #                                          Main()                                         #
@@ -218,15 +276,22 @@ else
 	if [[ $1 == "-i" ]]; then
 		InstallPrereqs
 	fi
+
     # setup server name
     VerifyEnvironmentVars
     ReplaceNames
 
     if [[ !$SKIP_CERT_GENERATION ]]; then
         ConfigureCerts
+        ./exportCert.sh
     fi
 
-    ConfigureUnbound
-    ConfigureNginx
     BuildAndRunWebService
-fi
+    ConfigureNginx
+    ConfigureUnbound
+
+    if [[ $1 == "-p" || $2 == "-p" ]]; then
+        BuildAndRunProxy
+        PrintConf
+    fi
+fi  
