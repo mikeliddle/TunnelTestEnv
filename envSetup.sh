@@ -248,6 +248,17 @@ BuildAndRunWebService() {
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 }
 
+
+PrintConf() {
+    echo "=================== Use the following to configure Microsoft Tunnel Server ======================="
+    echo "DNS server: $UNBOUND_IP"
+    echo "Proxy server names: $PROXY_IP proxy.$DOMAIN_NAME"
+    echo "Proxy server port: 3128"
+    echo "PAC URL: http://$DOMAIN_NAME/tunnel.pac"
+    echo "Proxy bypassed names: ${PROXY_BYPASS_NAMES[*]}"
+    echo "Proxy allowed names: ${PROXY_ALLOWED_NAMES[*]}"
+    echo "=================================================================================================="
+}
 ###########################################################################################
 #                                                                                         #
 #                                          Main()                                         #
@@ -277,4 +288,6 @@ else
     ConfigureNginx
     ConfigureUnbound
     BuildAndRunProxy
+
+    PrintConf
 fi  
