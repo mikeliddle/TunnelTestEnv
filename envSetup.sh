@@ -23,12 +23,6 @@ InstallPrereqs() {
 	cd acme.sh
 
 	./acme.sh --install -m $EMAIL
-
-	acme.sh --upgrade
-	acme.sh --set-default-ca --server letsencrypt
-	acme.sh --register-account
-
-	acme.sh --upgrade --update-account --accountemail $EMAIL
 	
 	cd ..
 }
@@ -139,6 +133,12 @@ ConfigureCerts() {
         certs/untrusted.pem -keyout private/untrusted.key
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
+		acme.sh --upgrade
+		acme.sh --set-default-ca --server letsencrypt
+		acme.sh --register-account
+
+		acme.sh --upgrade --update-account --accountemail $EMAIL
+
 		acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"
 
         openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
