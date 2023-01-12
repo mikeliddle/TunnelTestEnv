@@ -275,6 +275,7 @@ else
 	if [[ $1 == "-i" ]]; then
 		InstallPrereqs
 	fi
+
     # setup server name
     VerifyEnvironmentVars
     ReplaceNames
@@ -287,7 +288,9 @@ else
     BuildAndRunWebService
     ConfigureNginx
     ConfigureUnbound
-    BuildAndRunProxy
 
-    PrintConf
+    if [[ $1 == "-p" || $2 == "-p" ]]; then
+        BuildAndRunProxy
+        PrintConf
+    fi
 fi  
