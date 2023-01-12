@@ -215,6 +215,7 @@ BuildAndRunProxy() {
 
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
+    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     docker restart unbound
 
     docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
