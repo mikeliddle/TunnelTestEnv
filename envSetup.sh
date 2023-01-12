@@ -143,9 +143,6 @@ ConfigureCerts() {
 
 		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem
 		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key
-
-        openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
-            -in certs/letsencrypt.pem -nodes -password pass:
     fi
 
     cd $current_dir
@@ -225,9 +222,10 @@ if [[ $1 == "-h" ]]; then
     Help
 elif [[ $1 == "-r" ]]; then
     Uninstall
-elif [[ $1 == "-i" ]]; then
-	InstallPrereqs
 else
+	if [[ $1 == "-i" ]]; then
+		InstallPrereqs
+	fi
     # setup server name
     VerifyEnvironmentVars
     ReplaceNames
