@@ -19,6 +19,18 @@ InstallPrereqs() {
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
     ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
     systemctl stop systemd-resolved
+
+	cd acme.sh
+
+	./acme.sh --install -m $EMAIL
+
+	acme.sh --upgrade
+	acme.sh --set-default-ca --server letsencrypt
+	acme.sh --register-account
+
+	acme.sh --upgrade --update-account --accountemail $EMAIL
+	
+	cd ..
 }
 
 Help() {
@@ -127,18 +139,7 @@ ConfigureCerts() {
         certs/untrusted.pem -keyout private/untrusted.key
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
-        cd $current_dir/acme.sh
-
-		./acme.sh --install -m $EMAIL
-
-		acme.sh --upgrade
-		acme.sh --set-default-ca --server letsencrypt
-		acme.sh --register-account
-
-		acme.sh --upgrade --update-account --accountemail $EMAIL
 		acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"
-
-		exit 0
 
         openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
             -in certs/letsencrypt.pem -nodes -password pass:
@@ -221,11 +222,9 @@ if [[ $1 == "-h" ]]; then
     Help
 elif [[ $1 == "-r" ]]; then
     Uninstall
+elif [[ $1 == "-i" ]]; then
+	InstallPrereqs
 else
-    if [[ $1 == "-i" ]]; then
-        InstallPrereqs
-    fi
-
     # setup server name
     VerifyEnvironmentVars
     ReplaceNames
