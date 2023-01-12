@@ -51,9 +51,6 @@ Uninstall() {
     docker stop unbound
     docker rm unbound
 
-    docker stop simpleapp	
-    docker rm simpleapp
-
     docker stop webService
     docker rm webService
 
@@ -209,6 +206,8 @@ BuildAndRunWebService() {
 #                                          Main()                                         #
 #                                                                                         #
 ###########################################################################################
+
+. vars
 
 if [[ $1 == "-h" ]]; then
     Help

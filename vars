@@ -1,0 +1,4 @@
+SERVER_NAME=example
+DOMAIN_NAME=example.com
+SERVER_PRIVATE_IP=10.x.x.x
+SERVER_PUBLIC_IP=20.x.x.x
