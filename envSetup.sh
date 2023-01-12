@@ -36,6 +36,8 @@ Help() {
     echo "	SERVER_PRIVATE_IP=10.x.x.x"
     echo "	SERVER_PUBLIC_IP=20.x.x.x"
     echo ""
+    echo "  EMAIL=example@example.com"
+    echo ""
     echo "Optional"
     echo "  export SKIP_LETS_ENCRYPT=1 - to skip the letsencrypt automation steps"
     echo "  export SKIP_CERT_GENERATION=1 - to skip generating new PKI certs"
@@ -144,6 +146,9 @@ ConfigureCerts() {
 ConfigureUnbound() {
     # create the unbound volume
     docker volume create unbound
+    
+    RESOURCE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.$TUNNEL_SERVER_NETWORK_NAME.IPAddress }}" $RESOURCE_NAME)
+
 
     # run the unbound container
     docker run -d \
@@ -158,6 +163,8 @@ ConfigureUnbound() {
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     # restart to apply config change
     docker restart unbound
+
+    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
 }
 
 ConfigureNginx() {
@@ -170,14 +177,46 @@ ConfigureNginx() {
     cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
     cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
 
-	# run the containers
+	# run the containers on the docker subnet
 	docker run -d \
 		--name=nginx \
 		--mount source=nginx-vol,destination=/etc/volume \
-		-p 443:443 \
 		--restart=unless-stopped \
 		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
 		nginx
+
+    NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+}
+
+BuildAndRunProxy() {
+    PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
+
+    sed -i -e "s/\bPROXY_HOST_NAME\b/proxy/g" nginx_data/tunnel.pac
+    sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
+    for pan in "${PROXY_BYPASS_NAMES[@]}"; do
+        panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
+        sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
+    done
+
+    sed -i -e "s#\bTUNNEL_CLIENT_SUBNET\b#$TUNNEL_CLIENT_SUBNET#g" proxy/etc/squid/squid.conf
+    sed -i -e "s/\bPROXY_PORT\b/3128/g" proxy/etc/squid/squid.conf
+    for pan in "${PROXY_ALLOWED_NAMES[@]}"; do
+        echo "$pan" >> proxy/etc/squid/allowlist
+    done
+    docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile 
+    docker run -d \
+            --name proxy \
+            --restart always \
+            --volume /etc/squid \
+            --dns "$BIND9_IP" \
+            --dns-search "$DOMAIN_NAME" \
+            ubuntu:squid
+
+    PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+
+    docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
+    docker cp proxy/etc/squid/allowlist proxy:/etc/squid/allowlist
+    docker restart proxy
 }
 
 ###########################################################################################
@@ -224,9 +263,10 @@ else
 
     if [[ !$SKIP_CERT_GENERATION ]]; then
         ConfigureCerts
+        ./exportCert.sh
     fi
 
-    ConfigureUnbound
     ConfigureNginx
+    ConfigureUnbound
     BuildAndRunWebService
-fi
+fi  
