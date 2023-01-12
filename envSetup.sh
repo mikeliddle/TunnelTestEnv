@@ -54,6 +54,9 @@ Uninstall() {
     docker stop webService
     docker rm webService
 
+    docker stop proxy
+    docker rm proxy
+
     echo "removing docker volumes"
     docker volume rm nginx-vol
     docker volume rm unbound
@@ -183,6 +186,7 @@ ConfigureNginx() {
 		nginx
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
 }
 
 BuildAndRunProxy() {
@@ -236,6 +240,9 @@ BuildAndRunWebService() {
         samplewebservice
 
     cd $current_dir
+
+    WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 }
 
 ###########################################################################################
@@ -263,8 +270,9 @@ else
         ./exportCert.sh
     fi
 
-    ConfigureNginx
-    ConfigureUnbound
-    BuildAndRunProxy
     BuildAndRunWebService
+    ConfigureNginx
+    BuildAndRunProxy
+
+    ConfigureUnbound
 fi  
