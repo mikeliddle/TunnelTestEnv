@@ -246,6 +246,7 @@ BuildAndRunWebService() {
 
     WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
+    sed -i "s/# local-data/local-data/g" *.d/*.conf
 }
 
 
