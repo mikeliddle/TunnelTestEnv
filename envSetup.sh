@@ -127,10 +127,18 @@ ConfigureCerts() {
         certs/untrusted.pem -keyout private/untrusted.key
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
-        certbot certonly --standalone
+        cd $current_dir/acme.sh
 
-        cp /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem certs/letsencrypt.pem
-        cp /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem private/letsencrypt.key
+		./acme.sh --install -m $EMAIL
+
+		acme.sh --upgrade
+		acme.sh --set-default-ca --server letsencrypt
+		acme.sh --register-account
+
+		acme.sh --upgrade --update-account --accountemail $EMAIL
+		acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"
+
+		exit 0
 
         openssl pkcs12 -export -out private/letsencrypt.pfx -inkey private/letsencrypt.key \
             -in certs/letsencrypt.pem -nodes -password pass:
