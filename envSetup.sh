@@ -205,7 +205,7 @@ BuildAndRunProxy() {
             --name proxy \
             --restart always \
             --volume /etc/squid \
-            --dns "$BIND9_IP" \
+            --dns "$UNBOUND_IP" \
             --dns-search "$DOMAIN_NAME" \
             ubuntu:squid
 
