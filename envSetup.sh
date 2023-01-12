@@ -6,14 +6,6 @@ InstallPrereqs() {
     apt remove -y docker >>  run.log 2>&1
     apt install -y docker.io >> run.log 2>&1
 
-    if [[ !$SKIP_LETS_ENCRYPT ]]; then
-        echo "installing ACME certbot"
-        snap install core
-        snap refresh core
-        snap install --classic certbot
-        ln -s /snap/bin/certbot /usr/bin/certbot
-    fi
-
     echo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
