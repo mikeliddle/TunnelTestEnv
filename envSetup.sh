@@ -146,9 +146,6 @@ ConfigureCerts() {
 ConfigureUnbound() {
     # create the unbound volume
     docker volume create unbound
-    
-    RESOURCE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.$TUNNEL_SERVER_NETWORK_NAME.IPAddress }}" $RESOURCE_NAME)
-
 
     # run the unbound container
     docker run -d \
@@ -268,5 +265,6 @@ else
 
     ConfigureNginx
     ConfigureUnbound
+    BuildAndRunProxy
     BuildAndRunWebService
 fi  
