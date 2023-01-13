@@ -189,10 +189,16 @@ ConfigureNginx() {
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
 }
 
+###########################################################################################
+#                                                                                         #
+#                             Simple Squid Proxy Setup                                    #
+#                                                                                         #
+###########################################################################################
+
 BuildAndRunProxy() {
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
 
-    sed -i -e "s/\bPROXY_HOST_NAME\b/proxy/g" nginx_data/tunnel.pac
+    sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
     for pan in "${PROXY_BYPASS_NAMES[@]}"; do
         panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
@@ -224,6 +230,17 @@ BuildAndRunProxy() {
     docker restart proxy
 }
 
+PrintConf() {
+    echo "=================== Use the following to configure Microsoft Tunnel Server ======================="
+    echo "DNS server: $UNBOUND_IP"
+    echo "Proxy server names: $PROXY_IP proxy.$DOMAIN_NAME"
+    echo "Proxy server port: 3128"
+    echo "PAC URL: http://$DOMAIN_NAME/tunnel.pac"
+    echo "Proxy bypassed names: ${PROXY_BYPASS_NAMES[*]}"
+    echo "Proxy allowed names: ${PROXY_ALLOWED_NAMES[*]}"
+    echo "=================================================================================================="
+}
+
 ###########################################################################################
 #                                                                                         #
 #                                    JS SPA env setup                                     #
@@ -249,17 +266,13 @@ BuildAndRunWebService() {
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 }
 
+###########################################################################################
+#                                                                                         #
+#                              Install Tunnel Appliance                                   #
+#                                                                                         #
+###########################################################################################
 
-PrintConf() {
-    echo "=================== Use the following to configure Microsoft Tunnel Server ======================="
-    echo "DNS server: $UNBOUND_IP"
-    echo "Proxy server names: $PROXY_IP proxy.$DOMAIN_NAME"
-    echo "Proxy server port: 3128"
-    echo "PAC URL: http://$DOMAIN_NAME/tunnel.pac"
-    echo "Proxy bypassed names: ${PROXY_BYPASS_NAMES[*]}"
-    echo "Proxy allowed names: ${PROXY_ALLOWED_NAMES[*]}"
-    echo "=================================================================================================="
-}
+
 ###########################################################################################
 #                                                                                         #
 #                                          Main()                                         #
