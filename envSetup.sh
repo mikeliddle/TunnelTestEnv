@@ -205,8 +205,6 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    sed -i -e "s#\bTUNNEL_CLIENT_SUBNET\b#$TUNNEL_CLIENT_SUBNET#g" proxy/etc/squid/squid.conf
-    sed -i -e "s/\bPROXY_PORT\b/3128/g" proxy/etc/squid/squid.conf
     for pan in "${PROXY_ALLOWED_NAMES[@]}"; do
         echo "$pan" >> proxy/etc/squid/allowlist
     done
