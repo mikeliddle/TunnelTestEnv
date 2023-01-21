@@ -211,7 +211,10 @@ ConfigureNginx() {
 
 BuildAndRunProxy() {
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
-    
+
+    sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
+    sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
+
     for pan in "${PROXY_BYPASS_NAMES[@]}"; do
         echo "Proxy bypass name: $pan"
         panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
