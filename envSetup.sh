@@ -94,7 +94,7 @@ VerifyEnvironmentVars() {
     if [ -z $PROXY_BYPASS_NAMES ]; then
         echo "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
     fi
-    if [ -z $fail ]; then
+    if [ !$fail ]; then
         exit
     fi
 }
@@ -329,6 +329,7 @@ do
     esac
 done
 
+echo "exited getopts"
 # setup server name
 VerifyEnvironmentVars
 ReplaceNames
