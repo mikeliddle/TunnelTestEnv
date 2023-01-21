@@ -94,9 +94,11 @@ VerifyEnvironmentVars() {
     if [ -z $PROXY_BYPASS_NAMES ]; then
         echo "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
     fi
+    echo $fail
     if [ !$fail ]; then
         exit
     fi
+    echo "exiting Verify "
 }
 
 ReplaceNames() {
@@ -114,6 +116,7 @@ ReplaceNames() {
 ###########################################################################################
 
 ConfigureCerts() {
+    echo "configuring certs"
     # push current directory
     current_dir=$(pwd)
 
@@ -321,7 +324,7 @@ do
             exit
             ;;
         i)
-            InstallPrereqs        
+            InstallPrereqs     
             ;;
         p)
             INSTALL_PROXY=1
@@ -329,7 +332,6 @@ do
     esac
 done
 
-echo "exited getopts"
 # setup server name
 VerifyEnvironmentVars
 ReplaceNames
