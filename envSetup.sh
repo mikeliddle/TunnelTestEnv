@@ -201,6 +201,10 @@ ConfigureNginx() {
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
+
+    cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
+
+    docker restart nginx
 }
 
 ###########################################################################################
