@@ -71,22 +71,21 @@ Uninstall() {
 }
 
 VerifyEnvironmentVars() {
-    fail=1
     if [ -z $SERVER_NAME ]; then
         echo "MISSING SERVER NAME... Aborting."
-        fail=0
+        fail=1
     fi
     if [ -z $DOMAIN_NAME ]; then
         echo "MISSING DOMAIN NAME... Aborting."
-        fail=0
+        fail=1
     fi
     if [ -z $SERVER_PUBLIC_IP ]; then
         echo "MISSING PUBLIC IP... Aborting."
-        fail=0
+        fail=1
     fi
     if [ -z $EMAIL ]; then
         echo "MISSING EMAIL... Aborting."
-        fail=0
+        fail=1
     fi
     if [ -z $PROXY_ALLOWED_NAMES ]; then
         echo "MISSING PROXY ALLOWED NAMES, no urls will be allowed through the proxy."
@@ -94,11 +93,9 @@ VerifyEnvironmentVars() {
     if [ -z $PROXY_BYPASS_NAMES ]; then
         echo "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
     fi
-    echo $fail
-    if [ !$fail ]; then
+    if [ $fail ]; then
         exit
     fi
-    echo "exiting Verify "
 }
 
 ReplaceNames() {
