@@ -64,6 +64,9 @@ Uninstall() {
     echo "removing /etc/pki/tls folder"
     rm -rf /etc/pki/tls
 
+    echo "uninstalling tunnel"
+    mst-cli uninstall
+
     git reset --hard
 }
 
