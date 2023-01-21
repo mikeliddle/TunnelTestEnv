@@ -94,7 +94,7 @@ VerifyEnvironmentVars() {
     if [ -z $PROXY_BYPASS_NAMES ]; then
         echo "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
     fi
-    if [ -z fail ]
+    if [ -z $fail ]; then
         exit
     fi
 }
