@@ -20,9 +20,10 @@ InstallPrereqs() {
 }
 
 Help() {
-    echo "Usage: sudo ./envSetup.sh [-i|-h|-r]"
+    echo "Usage: sudo ./envSetup.sh [-i|-h|-r|-p]"
     echo "  -i : install pre-reqs before configuring and setting up the environment"
     echo "  -r : remove the configuration. Doesn't uninstall pre-reqs or undo steps to deisable systemd-resolved"
+    echo "  -p : install and configure a squid proxy"
     echo "  -h : print out this help and usage message :)"
     echo ""
     echo "Note: this command needs root for installation commands, for running docker commands, "
@@ -33,7 +34,6 @@ Help() {
     echo "Before running, set the following environment variables in the file 'vars':"
     echo "	SERVER_NAME=example"
     echo "	DOMAIN_NAME=example.com"
-    echo "	SERVER_PRIVATE_IP=10.x.x.x"
     echo "	SERVER_PUBLIC_IP=20.x.x.x"
     echo ""
     echo "  EMAIL=example@example.com"
@@ -63,23 +63,37 @@ Uninstall() {
 
     echo "removing /etc/pki/tls folder"
     rm -rf /etc/pki/tls
+
+    echo "uninstalling tunnel"
+    mst-cli uninstall
+
+    git reset --hard
 }
 
 VerifyEnvironmentVars() {
     if [ -z $SERVER_NAME ]; then
         echo "MISSING SERVER NAME... Aborting."
-        exit
+        fail=1
     fi
     if [ -z $DOMAIN_NAME ]; then
         echo "MISSING DOMAIN NAME... Aborting."
-        exit
-    fi
-    if [ -z $SERVER_PRIVATE_IP ]; then
-        echo "MISSING PRIVATE IP... Aborting."
-        exit
+        fail=1
     fi
     if [ -z $SERVER_PUBLIC_IP ]; then
         echo "MISSING PUBLIC IP... Aborting."
+        fail=1
+    fi
+    if [ -z $EMAIL ]; then
+        echo "MISSING EMAIL... Aborting."
+        fail=1
+    fi
+    if [ -z $PROXY_ALLOWED_NAMES ]; then
+        echo "MISSING PROXY ALLOWED NAMES, no urls will be allowed through the proxy."
+    fi
+    if [ -z $PROXY_BYPASS_NAMES ]; then
+        echo "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
+    fi
+    if [ $fail ]; then
         exit
     fi
 }
@@ -89,7 +103,6 @@ ReplaceNames() {
 
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
-    sed -i "s/##SERVER_PRIVATE_IP##/${SERVER_PRIVATE_IP}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
 }
 
@@ -100,6 +113,7 @@ ReplaceNames() {
 ###########################################################################################
 
 ConfigureCerts() {
+    echo "configuring certs"
     # push current directory
     current_dir=$(pwd)
 
@@ -187,6 +201,10 @@ ConfigureNginx() {
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
+
+    cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
+
+    docker restart nginx
 }
 
 ###########################################################################################
@@ -200,13 +218,13 @@ BuildAndRunProxy() {
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
+
     for pan in "${PROXY_BYPASS_NAMES[@]}"; do
+        echo "Proxy bypass name: $pan"
         panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    sed -i -e "s#\bTUNNEL_CLIENT_SUBNET\b#$TUNNEL_CLIENT_SUBNET#g" proxy/etc/squid/squid.conf
-    sed -i -e "s/\bPROXY_PORT\b/3128/g" proxy/etc/squid/squid.conf
     for pan in "${PROXY_ALLOWED_NAMES[@]}"; do
         echo "$pan" >> proxy/etc/squid/allowlist
     done
@@ -221,6 +239,8 @@ BuildAndRunProxy() {
 
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
+    sed -i "s/PROXY_IP/${PROXY_IP}/g" nginx_data/tunnel.pac
+    cp nginx_data/tunnel.pac /var/lib/docker/nginx-vol/_data/data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     docker restart unbound
@@ -271,7 +291,24 @@ BuildAndRunWebService() {
 #                              Install Tunnel Appliance                                   #
 #                                                                                         #
 ###########################################################################################
+InstallTunnelAppliance() {
+    # Download the installation script 
+    wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
+    chmod +x ./mstunnel-setup
 
+    # make the correct directories
+    mkdir /etc/mstunnel
+    mkdir /etc/mstunnel/certs
+    mkdir /etc/mstunnel/private
+    touch /etc/mstunnel/EulaAccepted
+
+    # put the certs in place
+    cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
+    cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
+
+    # Install
+    ./mstunnel-setup
+}
 
 ###########################################################################################
 #                                                                                         #
@@ -281,30 +318,41 @@ BuildAndRunWebService() {
 
 . vars
 
-if [[ $1 == "-h" ]]; then
-    Help
-elif [[ $1 == "-r" ]]; then
-    Uninstall
-else
-	if [[ $1 == "-i" ]]; then
-		InstallPrereqs
-	fi
+while getopts "hrip" options
+do
+    case "${options}" in
+        h)
+            Help
+            ;;
+        r)
+            Uninstall
+            exit
+            ;;
+        i)
+            InstallPrereqs     
+            ;;
+        p)
+            INSTALL_PROXY=1
+            ;;
+    esac
+done
 
-    # setup server name
-    VerifyEnvironmentVars
-    ReplaceNames
+# setup server name
+VerifyEnvironmentVars
+ReplaceNames
 
-    if [[ !$SKIP_CERT_GENERATION ]]; then
-        ConfigureCerts
-        ./exportCert.sh
-    fi
+if [[ !$SKIP_CERT_GENERATION ]]; then
+    ConfigureCerts
+    ./exportCert.sh
+fi
 
-    BuildAndRunWebService
-    ConfigureNginx
-    ConfigureUnbound
+InstallTunnelAppliance
 
-    if [[ $1 == "-p" || $2 == "-p" ]]; then
-        BuildAndRunProxy
-        PrintConf
-    fi
-fi  
+BuildAndRunWebService
+ConfigureNginx
+ConfigureUnbound
+
+if [[ $INSTALL_PROXY ]]; then
+    BuildAndRunProxy
+    PrintConf
+fi
