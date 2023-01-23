@@ -240,7 +240,7 @@ BuildAndRunProxy() {
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
     sed -i "s/PROXY_IP/${PROXY_IP}/g" nginx_data/tunnel.pac
-    cp nginx_data/tunnel.pac /var/lib/docker/nginx-vol/_data/data/tunnel.pac
+    cp nginx_data/tunnel.pac /var/lib/docker/volumes/nginx-vol/_data/data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     docker restart unbound
@@ -253,11 +253,21 @@ BuildAndRunProxy() {
 PrintConf() {
     echo "=================== Use the following to configure Microsoft Tunnel Server ======================="
     echo "DNS server: $UNBOUND_IP"
-    echo "Proxy server names: $PROXY_IP proxy.$DOMAIN_NAME"
-    echo "Proxy server port: 3128"
-    echo "PAC URL: http://$DOMAIN_NAME/tunnel.pac"
-    echo "Proxy bypassed names: ${PROXY_BYPASS_NAMES[*]}"
-    echo "Proxy allowed names: ${PROXY_ALLOWED_NAMES[*]}"
+
+    if [[ $INSTALL_PROXY ]]; then
+        echo "Proxy server names: $PROXY_IP proxy.$DOMAIN_NAME"
+        echo "Proxy server port: 3128"
+        echo "PAC URL: http://$DOMAIN_NAME/tunnel.pac"
+        echo "Proxy bypassed names: ${PROXY_BYPASS_NAMES[*]}"
+        echo "Proxy allowed names: ${PROXY_ALLOWED_NAMES[*]}"
+    fi
+
+    echo "Configured endpoints behind firewall:"
+    echo "  https://${DOMAIN_NAME}"
+    echo "  https://trusted.${DOMAIN_NAME}"
+    echo "  https://untrusted.${DOMAIN_NAME}"
+    echo "  https://webapp.${DOMAIN_NAME}"
+    echo "  http://${DOMAIN_NAME}"
     echo "=================================================================================================="
 }
 
