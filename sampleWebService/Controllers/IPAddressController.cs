@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using TodoApi.Models;
 
 namespace TodoApi.Controllers
 {
@@ -9,10 +10,10 @@ namespace TodoApi.Controllers
         public IPAddressController() {}
 
         [HttpGet]
-        public ActionResult<string> GetIPAddress()
+        public ActionResult<IPAddressModel> GetIPAddress()
         {
             var ip = Request.HttpContext.Connection.RemoteIpAddress;
-            return ip.ToString();
+            return new IPAddressModel() { IPAddress = ip.ToString() };
         }
     }
 }
