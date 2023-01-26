@@ -1,6 +1,13 @@
 const uri = 'api/todoitems';
 let todos = [];
 
+function getIPAddress() {
+  fetch("api/IPAddress")
+    .then(response => response.json())
+    .then(data => document.getElementById("ip_address_span").innerHTML=data["ipAddress"])
+    .catch(error => console.error("unable to get ip address.", error));
+}
+
 function getItems() {
   fetch(uri)
     .then(response => response.json())
