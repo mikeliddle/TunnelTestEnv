@@ -13,7 +13,7 @@ namespace TodoApi.Controllers
         public ActionResult<IPAddressModel> GetIPAddress()
         {
             var ip = Request.HttpContext.Connection.RemoteIpAddress;
-            return new IPAddressModel() { IPAddress = ip.ToString() };
+            return new IPAddressModel() { IPAddress = ip.MapToIPv4().ToString() };
         }
     }
 }
