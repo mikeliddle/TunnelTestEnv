@@ -20,10 +20,12 @@ InstallPrereqs() {
 }
 
 Help() {
-    echo "Usage: sudo ./envSetup.sh [-i|-h|-r|-p]"
+    echo "Usage: sudo ./envSetup.sh [options]"
     echo "  -i : install pre-reqs before configuring and setting up the environment"
     echo "  -r : remove the configuration. Doesn't uninstall pre-reqs or undo steps to deisable systemd-resolved"
     echo "  -p : install and configure a squid proxy"
+    echo "  -e : configure the tunnel appliance to use the enterprise CA for it's TLS cert"
+    echo "  -u : redeploy proxy, webservers, and dns servers"
     echo "  -h : print out this help and usage message :)"
     echo ""
     echo "Note: this command needs root for installation commands, for running docker commands, "
@@ -306,18 +308,102 @@ InstallTunnelAppliance() {
     wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
     chmod +x ./mstunnel-setup
 
+    # Install
+    ./mstunnel-setup
+}
+
+SetupTunnelPrereqs() {
     # make the correct directories
     mkdir /etc/mstunnel
     mkdir /etc/mstunnel/certs
     mkdir /etc/mstunnel/private
     touch /etc/mstunnel/EulaAccepted
+}
 
+###########################################################################################
+#                                                                                         #
+#                                  Update Tunnel Certs                                    #
+#                                                                                         #
+###########################################################################################
+SetupEnterpriseCerts() {
+    # put the certs in place
+    # no need using a different server cert, just need to reformat it.
+    cp /etc/pki/tls/certs/server.pem /etc/pki/tls/certs/tunnel.pem
+    cat /etc/pki/tls/certs/cacert.pem >> /etc/pki/tls/certs/tunnel.pem
+
+    cp /etc/pki/tls/certs/tunnel.pem /etc/mstunnel/certs/site.crt    
+    cp /etc/pki/tls/private/server.key /etc/mstunnel/private/site.key
+
+    echo "Make sure this root certificate is uploaded to Intune and targeted properly"
+    cat /etc/pki/tls/certs/cacert.pem
+}
+
+SetupTunnelCerts() {
     # put the certs in place
     cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
     cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
+}
 
-    # Install
-    ./mstunnel-setup
+###########################################################################################
+#                                                                                         #
+#                                          Update                                         #
+#                                                                                         #
+###########################################################################################
+Update(){
+    # capture initial state
+    NGINX_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    WEBAPP_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    PROXY_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+    UNBOUND_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    
+    # start with nginx
+    docker stop nginx
+    docker rm nginx
+    docker volume rm nginx_vol
+    
+    ConfigureNginx
+
+    NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    if [[NGINX_INITIAL_IP -ne NGINX_IP]]; then
+        echo "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
+    fi
+
+    # Next do the webapp
+    docker stop webService
+    docker rm webService
+
+    BuildAndRunWebService
+
+    WEBAPP_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    if [[WEBAPP_INITIAL_IP -ne WEBAPP_IP]]; then
+        echo "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
+    fi
+
+    # next the proxy?
+    $PROXY_ENABLED=$(docker container ls | grep proxy)
+    if [[$PROXY_ENABLED]]; then 
+        docker stop proxy
+        docker rm proxy
+
+        BuildAndRunProxy
+
+        PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+        if [[PROXY_INITIAL_IP -ne PROXY_IP]]; then
+            echo "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
+        fi
+    fi
+
+    # Last, unbound
+    docker stop unbound
+    docker rm unbound
+    docker volume rm unbound
+
+    ConfigureUnbound
+
+    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    if [[UNBOUND_INITIAL_IP -ne UNBOUND_IP]]; then
+        echo "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
+    fi
 }
 
 ###########################################################################################
@@ -328,7 +414,7 @@ InstallTunnelAppliance() {
 
 . vars
 
-while getopts "hrip" options
+while getopts "hripeu" options
 do
     case "${options}" in
         h)
@@ -341,8 +427,20 @@ do
         i)
             InstallPrereqs     
             ;;
+        e)
+            ENTERPRISE_CA=1
+            ;;
         p)
             INSTALL_PROXY=1
+            ;;
+        u)
+            VerifyEnvironmentVars
+            ReplaceNames
+            Update
+            exit
+            ;;
+        ?)
+            Help
             ;;
     esac
 done
@@ -354,6 +452,12 @@ ReplaceNames
 if [[ !$SKIP_CERT_GENERATION ]]; then
     ConfigureCerts
     ./exportCert.sh
+fi
+
+if [[ $ENTERPRISE_CA ]]; then
+    SetupEnterpriseCerts
+else
+    SetupTunnelCerts
 fi
 
 InstallTunnelAppliance
