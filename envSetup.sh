@@ -435,6 +435,7 @@ do
             ;;
         ?)
             Help
+	    exit
             ;;
     esac
 done
