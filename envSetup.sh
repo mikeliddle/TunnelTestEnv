@@ -13,7 +13,7 @@ InstallPrereqs() {
     systemctl stop systemd-resolved
 
 	cd acme.sh
-
+    
 	./acme.sh --install -m $EMAIL
 	
 	cd ..
@@ -70,6 +70,8 @@ Uninstall() {
     mst-cli uninstall
 
     git reset --hard
+    git pull --recurse-submodules # Needed to reset acme.sh
+    chmod +x envSetup.sh exportCert.sh 
 }
 
 VerifyEnvironmentVars() {
@@ -310,14 +312,6 @@ InstallTunnelAppliance() {
 
     # Install
     ./mstunnel-setup
-}
-
-SetupTunnelPrereqs() {
-    # make the correct directories
-    mkdir /etc/mstunnel
-    mkdir /etc/mstunnel/certs
-    mkdir /etc/mstunnel/private
-    touch /etc/mstunnel/EulaAccepted
 }
 
 ###########################################################################################
