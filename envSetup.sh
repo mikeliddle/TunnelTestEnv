@@ -413,6 +413,7 @@ do
     case "${options}" in
         h)
             Help
+	    exit
             ;;
         r)
             Uninstall
