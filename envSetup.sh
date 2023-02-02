@@ -317,6 +317,13 @@ InstallTunnelAppliance() {
     ./mstunnel-setup
 }
 
+SetupTunnelPrereqs() {
+    # make the correct directories
+    mkdir /etc/mstunnel
+    mkdir /etc/mstunnel/certs
+    mkdir /etc/mstunnel/private
+}
+
 ###########################################################################################
 #                                                                                         #
 #                                  Update Tunnel Certs                                    #
@@ -447,6 +454,7 @@ done
 # setup server name
 VerifyEnvironmentVars
 ReplaceNames
+SetupTunnelPrereqs
 
 if [[ !$SKIP_CERT_GENERATION ]]; then
     ConfigureCerts
