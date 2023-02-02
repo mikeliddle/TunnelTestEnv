@@ -13,7 +13,7 @@ InstallPrereqs() {
     systemctl stop systemd-resolved
 
 	cd acme.sh
-
+    
 	./acme.sh --install -m $EMAIL
 	
 	cd ..
@@ -70,6 +70,8 @@ Uninstall() {
     mst-cli uninstall
 
     git reset --hard
+    git pull --recurse-submodules # Needed to reset acme.sh
+    chmod +x envSetup.sh exportCert.sh 
 }
 
 VerifyEnvironmentVars() {
@@ -304,6 +306,9 @@ BuildAndRunWebService() {
 #                                                                                         #
 ###########################################################################################
 InstallTunnelAppliance() {
+    # Touch EULA
+    touch /etc/mstunnel/EulaAccepted
+
     # Download the installation script 
     wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
     chmod +x ./mstunnel-setup
@@ -317,7 +322,6 @@ SetupTunnelPrereqs() {
     mkdir /etc/mstunnel
     mkdir /etc/mstunnel/certs
     mkdir /etc/mstunnel/private
-    touch /etc/mstunnel/EulaAccepted
 }
 
 ###########################################################################################
@@ -419,6 +423,7 @@ do
     case "${options}" in
         h)
             Help
+	    exit
             ;;
         r)
             Uninstall
@@ -441,6 +446,7 @@ do
             ;;
         ?)
             Help
+	    exit
             ;;
     esac
 done
@@ -448,6 +454,7 @@ done
 # setup server name
 VerifyEnvironmentVars
 ReplaceNames
+SetupTunnelPrereqs
 
 if [[ !$SKIP_CERT_GENERATION ]]; then
     ConfigureCerts
