@@ -306,6 +306,9 @@ BuildAndRunWebService() {
 #                                                                                         #
 ###########################################################################################
 InstallTunnelAppliance() {
+    # Touch EULA
+    touch /etc/mstunnel/EulaAccepted
+
     # Download the installation script 
     wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
     chmod +x ./mstunnel-setup
