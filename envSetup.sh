@@ -363,7 +363,7 @@ Update(){
     # start with nginx
     docker stop nginx
     docker rm nginx
-    docker volume rm nginx_vol
+    docker volume rm nginx-vol
     
     ConfigureNginx
 
