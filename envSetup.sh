@@ -108,6 +108,8 @@ ReplaceNames() {
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
+
+
 }
 
 ###########################################################################################
@@ -219,6 +221,7 @@ ConfigureNginx() {
 
 BuildAndRunProxy() {
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
+    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
@@ -365,6 +368,9 @@ Update(){
     docker stop nginx
     docker rm nginx
     docker volume rm nginx-vol
+
+    WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
     
     ConfigureNginx
 
