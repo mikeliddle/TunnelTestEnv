@@ -359,6 +359,7 @@ Update(){
     WEBAPP_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
     PROXY_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     UNBOUND_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP="$UNBOUND_INITIAL_IP"
     
     # start with nginx
     docker stop nginx
