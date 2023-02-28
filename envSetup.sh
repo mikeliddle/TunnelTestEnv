@@ -219,6 +219,7 @@ ConfigureNginx() {
 
 BuildAndRunProxy() {
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
+    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
@@ -229,9 +230,6 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    for pan in "${PROXY_ALLOWED_NAMES[@]}"; do
-        echo "$pan" >> proxy/etc/squid/allowlist
-    done
     docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile 
     docker run -d \
             --name proxy \
@@ -243,14 +241,13 @@ BuildAndRunProxy() {
 
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
-    sed -i "s/PROXY_IP/${PROXY_IP}/g" nginx_data/tunnel.pac
+    sed -i "s/PROXY_URL/proxy.${DOMAIN_NAME}/g" nginx_data/tunnel.pac
     cp nginx_data/tunnel.pac /var/lib/docker/volumes/nginx-vol/_data/data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     docker restart unbound
 
     docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
-    docker cp proxy/etc/squid/allowlist proxy:/etc/squid/allowlist
     docker restart proxy
 }
 
@@ -359,16 +356,20 @@ Update(){
     WEBAPP_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
     PROXY_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     UNBOUND_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP="$UNBOUND_INITIAL_IP"
     
     # start with nginx
     docker stop nginx
     docker rm nginx
-    docker volume rm nginx_vol
+    docker volume rm nginx-vol
+
+    WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
     
     ConfigureNginx
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
-    if [[NGINX_INITIAL_IP -ne NGINX_IP]]; then
+    if [ "${NGINX_INITIAL_IP}" != "${NGINX_IP}" ]; then
         echo "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
     fi
 
@@ -379,20 +380,20 @@ Update(){
     BuildAndRunWebService
 
     WEBAPP_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
-    if [[WEBAPP_INITIAL_IP -ne WEBAPP_IP]]; then
+    if [ "${WEBAPP_INITIAL_IP}" != "${WEBAPP_IP}" ]; then
         echo "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
     fi
 
     # next the proxy?
-    $PROXY_ENABLED=$(docker container ls | grep proxy)
-    if [[$PROXY_ENABLED]]; then 
+    PROXY_ENABLED=$(docker container ls | grep proxy)
+    if [ "${PROXY_ENABLED}" ]; then
         docker stop proxy
         docker rm proxy
 
         BuildAndRunProxy
 
         PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
-        if [[PROXY_INITIAL_IP -ne PROXY_IP]]; then
+        if [ "${PROXY_INITIAL_IP}" != "${PROXY_IP}" ]; then
             echo "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
         fi
     fi
@@ -405,7 +406,7 @@ Update(){
     ConfigureUnbound
 
     UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
-    if [[UNBOUND_INITIAL_IP -ne UNBOUND_IP]]; then
+    if [ "$UNBOUND_INITIAL_IP" != "$UNBOUND_IP" ]; then
         echo "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
     fi
 }
