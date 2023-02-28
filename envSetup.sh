@@ -368,7 +368,7 @@ Update(){
     ConfigureNginx
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
-    if [[NGINX_INITIAL_IP -ne NGINX_IP]]; then
+    if [[$NGINX_INITIAL_IP -ne $NGINX_IP]]; then
         echo "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
     fi
 
@@ -379,7 +379,7 @@ Update(){
     BuildAndRunWebService
 
     WEBAPP_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
-    if [[WEBAPP_INITIAL_IP -ne WEBAPP_IP]]; then
+    if [[$WEBAPP_INITIAL_IP -ne $WEBAPP_IP]]; then
         echo "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
     fi
 
@@ -392,7 +392,7 @@ Update(){
         BuildAndRunProxy
 
         PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
-        if [[PROXY_INITIAL_IP -ne PROXY_IP]]; then
+        if [[$PROXY_INITIAL_IP -ne $PROXY_IP]]; then
             echo "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
         fi
     fi
