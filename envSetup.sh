@@ -368,7 +368,7 @@ Update(){
     ConfigureNginx
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
-    if ["$NGINX_INITIAL_IP" -ne "$NGINX_IP"]; then
+    if [ "$NGINX_INITIAL_IP" -ne "$NGINX_IP" ]; then
         echo "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
     fi
 
@@ -379,20 +379,20 @@ Update(){
     BuildAndRunWebService
 
     WEBAPP_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
-    if ["$WEBAPP_INITIAL_IP" -ne "$WEBAPP_IP"]; then
+    if [ "$WEBAPP_INITIAL_IP" -ne "$WEBAPP_IP" ]; then
         echo "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
     fi
 
     # next the proxy?
-    $PROXY_ENABLED=$(docker container ls | grep proxy)
-    if ["$PROXY_ENABLED"]; then
+    PROXY_ENABLED=$(docker container ls | grep proxy)
+    if [ "$PROXY_ENABLED" ]; then
         docker stop proxy
         docker rm proxy
 
         BuildAndRunProxy
 
         PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
-        if ["$PROXY_INITIAL_IP" -ne "$PROXY_IP"]; then
+        if [ "$PROXY_INITIAL_IP" -ne "$PROXY_IP" ]; then
             echo "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
         fi
     fi
@@ -405,7 +405,7 @@ Update(){
     ConfigureUnbound
 
     UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
-    if ["$UNBOUND_INITIAL_IP" -ne "$UNBOUND_IP"]; then
+    if [ "$UNBOUND_INITIAL_IP" -ne "$UNBOUND_IP" ]; then
         echo "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
     fi
 }
