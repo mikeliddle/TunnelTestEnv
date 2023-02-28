@@ -108,8 +108,6 @@ ReplaceNames() {
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
-
-
 }
 
 ###########################################################################################
@@ -232,9 +230,6 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    for pan in "${PROXY_ALLOWED_NAMES[@]}"; do
-        echo "$pan" >> proxy/etc/squid/allowlist
-    done
     docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile 
     docker run -d \
             --name proxy \
@@ -253,7 +248,6 @@ BuildAndRunProxy() {
     docker restart unbound
 
     docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
-    docker cp proxy/etc/squid/allowlist proxy:/etc/squid/allowlist
     docker restart proxy
 }
 
