@@ -22,7 +22,7 @@ InstallPrereqs() {
 Help() {
     echo "Usage: sudo ./envSetup.sh [options]"
     echo "  -i : install pre-reqs before configuring and setting up the environment"
-    echo "  -r : remove the configuration. Doesn't uninstall pre-reqs or undo steps to deisable systemd-resolved"
+    echo "  -r : remove the configuration. Doesn't uninstall pre-reqs or undo steps to disable systemd-resolved"
     echo "  -p : install and configure a squid proxy"
     echo "  -e : configure the tunnel appliance to use the enterprise CA for it's TLS cert"
     echo "  -u : redeploy proxy, webservers, and dns servers"
@@ -108,6 +108,7 @@ ReplaceNames() {
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
+    sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" proxy/etc/squid/squid.conf
 }
 
 ###########################################################################################
