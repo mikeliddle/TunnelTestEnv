@@ -17,6 +17,10 @@ param(
     [Parameter(Mandatory=$false)]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"Canonical:UbuntuServer:18.04-LTS:18.04.202106220"
     [Parameter(Mandatory=$false)]
+    [string]$ADApplication = "Generated MAM Tunnel",
+    [Parameter(Mandatory=$false)]
+    [string[]]$BundleIds = $null,
+    [Parameter(Mandatory=$false)]
     [switch]$Delete
 )
 
@@ -27,6 +31,7 @@ $script:SSHKeyPath = $null
 $script:FQDN = $null
 $script:ServerConfiguration = $null
 $script:Site = $null
+$script:App = $null
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -50,7 +55,7 @@ Function Login {
     
     Write-Header "Logging into graph..."
     Write-Header "Select the account to manage the profiles."
-    Connect-MgGraph -Scopes "DeviceManagementConfiguration.ReadWrite.All" | Out-Null
+    Connect-MgGraph -Scopes "DeviceManagementConfiguration.ReadWrite.All", "Application.ReadWrite.All" | Out-Null
     
     # Switch to beta since most of our endpoints are there
     Select-MgProfile -Name "beta"    
@@ -89,7 +94,7 @@ Function Delete-ResourceGroup {
     Write-Header "Checking for group '$group'..."
     if ([bool](az group show --name $group --subscription $Subscription 2> $null)) {
         Write-Header "Deleting group '$group'..."
-        az group delete --name $group --yes
+        az group delete --name $group --yes --no-wait
     } else {
         Write-Host "Group '$group' does not exist"
     }
@@ -143,7 +148,6 @@ Function Stage-SetupScript {
 
 Function Create-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
-    #$fqdns = "dns.example.com"
     $ListenPort = 443
     $DnsServers = @("8.8.8.8")
     $Network = "169.254.0.0/16"
@@ -175,6 +179,94 @@ Function Delete-TunnelSite {
     }
 }
 
+Function CreateOrUpdate-ADApplication {
+    $script:App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
+    if($App) {
+        if ($BundleIds -and $BundleIds.Count -gt 0){
+            Write-Header "Found AD Application '$ADApplication'..."
+            $uris = [System.Collections.ArrayList]@()
+            foreach ($bundle in $BundleIds) {
+                $uri1 = "msauth://code/msauth.$bundle%3A%2F%2Fauth"
+                $uri2 = "msauth.$($bundle)://auth"
+                if(-Not $App.PublicClient.RedirectUris.Contains($uri1)) {
+                    Write-Host "Missing Uri '$uri1' for '$bundle', preparing to add."
+                    $uris.Add($uri1) | Out-Null
+                }
+                if(-Not $App.PublicClient.RedirectUris.Contains($uri2)) {
+                    Write-Host "Missing Uri '$uri2' for '$bundle', preparing to add."
+                    $uris.Add($uri2) | Out-Null
+                }
+            }
+            if($uris.Count -gt 0) {
+                $newUris = $App.PublicClient.RedirectUris + $uris
+                $PublicClient = @{
+                    RedirectUris = $newUris
+                }
+
+                Write-Header "Updating Redirect URIs..."
+                Update-MgApplication -ApplicationId $App.Id -PublicClient $PublicClient
+            }
+        }
+    } else {
+        Write-Header "Creating AD Application '$ADApplication'..."
+        $RequiredResourceAccess = @(
+            @{
+                ResourceAppId = "00000003-0000-0000-c000-000000000000"
+                ResourceAccess = @(
+                    @{
+                        Id = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+                        Type = "Scope"
+                    }
+                )
+            }
+            @{
+                ResourceAppId = "0a5f63c0-b750-4f38-a71c-4fc0d58b89e2"
+                ResourceAccess = @(
+                    @{
+                        Id = "3c7192af-9629-4473-9276-d35e4e4b36c5"
+                        Type = "Scope"
+                    }
+                )
+            }
+            @{
+                ResourceAppId = "3678c9e9-9681-447a-974d-d19f668fcd88"
+                ResourceAccess = @(
+                    @{
+                        Id = "eb539595-3fe1-474e-9c1d-feb3625d1be5"
+                        Type = "Scope"
+                    }
+                )
+            }
+        )
+        
+        $OptionalClaims = @{
+            IdToken = @()
+            AccessToken = @(
+                @{
+                    Name = "acct"
+                    Essential = $false
+                    AdditionalProperties = @()
+                }
+            )
+            Saml2Token = @()
+        }
+        $uris = [System.Collections.ArrayList]@()
+        foreach ($bundle in $BundleIds) {
+            $uris.Add("msauth://code/msauth.$bundle%3A%2F%2Fauth") | Out-Null
+            $uris.Add("msauth.$($bundle)://auth") | Out-Null
+        }
+        $PublicClient = @{
+            RedirectUris = $uris
+        }
+        
+        $script:App = New-MgApplication -DisplayName $ADApplication -RequiredResourceAccess $RequiredResourceAccess -OptionalClaims $OptionalClaims -PublicClient $PublicClient -SignInAudience "AzureADMyOrg"
+
+        Write-Header "You will need to grant consent. Opening browser in 15 seconds..."
+        Start-Sleep -Seconds 15
+        Start-Process "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/$($App.AppId)/isMSAApp~/false"
+    }
+}
+
 Function Create-Flow {
     Check-Prerequisites
     Login
@@ -184,6 +276,7 @@ Function Create-Flow {
     Create-NetworkRules
     Move-SSHKeys
     #Stage-SetupScript
+    CreateOrUpdate-ADApplication
     Create-TunnelConfiguration
     Create-TunnelSite
     Logout
