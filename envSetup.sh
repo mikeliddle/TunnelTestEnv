@@ -5,12 +5,19 @@ InstallPrereqs() {
     apt update > run.log 2>&1
     apt remove -y docker >>  run.log 2>&1
     apt install -y docker.io >> run.log 2>&1
+    apt install -y jq >> run.log 2>&1
 
     echo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
     ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
     systemctl stop systemd-resolved
+
+    wget aka.ms/mst-readiness
+    chmod +x mst-readiness
+
+    wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
+    chmod +x ./mstunnel-setup
 
 	cd acme.sh
     
@@ -312,14 +319,14 @@ InstallTunnelAppliance() {
     chmod +x ./mstunnel-setup
 
     # Install
-    ./mstunnel-setup
+    mst_no_prompt=1 ./mstunnel-setup
 }
 
 SetupTunnelPrereqs() {
     # make the correct directories
-    mkdir /etc/mstunnel
-    mkdir /etc/mstunnel/certs
-    mkdir /etc/mstunnel/private
+    mkdir -p /etc/mstunnel
+    mkdir -p /etc/mstunnel/certs
+    mkdir -p /etc/mstunnel/private
 }
 
 ###########################################################################################
