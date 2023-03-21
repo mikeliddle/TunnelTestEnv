@@ -18,8 +18,8 @@ param(
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"Canonical:UbuntuServer:18.04-LTS:18.04.202106220"
     [Parameter(Mandatory=$false)]
     [string]$ADApplication = "Generated MAM Tunnel",
-    [Parameter(Mandatory=$false)]
-    [string[]]$BundleIds = $null,
+    [Parameter(Mandatory=$true)]
+    [string[]]$BundleIds,
     [Parameter(Mandatory=$true)]
     [string]$GroupName,
     [Parameter(Mandatory=$false)]
@@ -36,6 +36,7 @@ $script:Site = $null
 $script:App = $null
 $script:Group = $null
 $script:AppProtectionPolicy = $null
+$script:AppConfigurationPolicy = $null
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -157,10 +158,15 @@ Function Stage-SetupScript {
 
 Function Create-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
-    $ListenPort = 443
-    $DnsServers = @("8.8.8.8")
-    $Network = "169.254.0.0/16"
-    $script:ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $VmName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Network -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes @() -RouteIncludes @() -SplitDns @()    
+    $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$VmName'" -Limit 1
+    if ($ServerConfiguration) {
+        Write-Header "Already found Server Configuration named '$VmName'"
+    } else {
+        $ListenPort = 443
+        $DnsServers = @("8.8.8.8")
+        $Network = "169.254.0.0/16"
+        $script:ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $VmName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Network -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes @() -RouteIncludes @() -SplitDns @()    
+    }
 }
 
 Function Delete-TunnelConfiguration {
@@ -175,7 +181,12 @@ Function Delete-TunnelConfiguration {
 
 Function Create-TunnelSite {
     Write-Header "Creating Site..."
-    $script:Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $VmName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id=$ServerConfiguration.id} -RoleScopeTagIds @("0") -UpgradeAutomatically    
+    $script:Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$VmName'" -Limit 1
+    if ($Site) {
+        Write-Header "Already found Site named '$VmName'"
+    } else {
+        $script:Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $VmName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id=$ServerConfiguration.id} -RoleScopeTagIds @("0") -UpgradeAutomatically    
+    }
 }
 
 Function Delete-TunnelSite {
@@ -298,9 +309,9 @@ Function Create-IosAppProtectionPolicy{
             appGroupType = "selectedPublicApps"
         } | ConvertTo-Json -Depth 10
         
-        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($AppProtectionPolicy.Id)')/targetApps" -Body $Body
-
+        
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
         $Body = @{
             assignments = @(
                 @{
@@ -329,6 +340,79 @@ Function Delete-IosAppProtectionPolicy{
     }
 }
 
+Function Create-IosAppConfigurationPolicy{
+    $DisplayName = "$VmName-Configuration"
+    $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($script:AppConfigurationPolicy) {
+        Write-Header "Already found App Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating App Configuration policy '$DisplayName'..."
+        $customSettings = @(
+            @{
+                name="com.microsoft.tunnel.connection_type"
+                value="MicrosoftProtect"
+            }
+            @{
+                name="com.microsoft.tunnel.connection_name"
+                value=$VmName
+            }
+            @{
+                name="com.microsoft.tunnel.site_id"
+                value=$Site.Id
+            }
+            @{
+                name="com.microsoft.tunnel.server_address"
+                value="$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+            }
+        )
+        $targetedApps = $BundleIds | ForEach-Object { 
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.iosMobileAppIdentifier"
+                    bundleId = $_
+                }
+            }
+        }
+        $body = @{
+            apps = $targetedApps
+            appGroupType = "selectedPublicApps"
+            customSettings = $customSettings
+            displayName = $DisplayName
+            targetedAppManagementLevels = "unspecified"
+        } | ConvertTo-Json -Depth 10
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
+        $script:AppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
+
+        Write-Header "Assigning App Configuration policy '$DisplayName' to group '$($Group.DisplayName)'..."
+        $Body = @{
+            assignments = @(
+                @{
+                    target = @{
+                        groupId = $Group.Id
+                        deviceAndAppManagementAssignmentFilterId = $null
+                        deviceAndAppManagementAssignmentFilterType = "none"
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                }
+            )
+        } | ConvertTo-Json -Depth 10
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations('$($AppConfigurationPolicy.Id)')/assign" -Body $Body
+    }
+}
+
+Function Delete-IosAppConfigurationPolicy{
+    $DisplayName = "$VmName-Configuration"
+    Write-Header "Deleting App Configuration Policy '$DisplayName'..."
+    $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    if($AppConfigurationPolicy) {
+        Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $AppConfigurationPolicy.Id
+    } else {
+        Write-Host "App Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
 Function Create-Flow {
     Check-Prerequisites
     Login
@@ -343,6 +427,7 @@ Function Create-Flow {
     Create-TunnelConfiguration
     Create-TunnelSite
     Create-IosAppProtectionPolicy
+    Create-IosAppConfigurationPolicy
     Logout
 }
 
@@ -353,12 +438,12 @@ Function Delete-Flow {
     Delete-ResourceGroup
     Delete-SSHKeys
 
+    Delete-IosAppConfigurationPolicy
     Delete-IosAppProtectionPolicy
     Delete-TunnelSite
     Delete-TunnelConfiguration
     Logout
 }
-
 
 if ($Delete) {
     Delete-Flow
