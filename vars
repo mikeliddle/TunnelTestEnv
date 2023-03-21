@@ -3,6 +3,7 @@ DOMAIN_NAME= # example.com
 SERVER_PUBLIC_IP= # 20.x.x.x
 
 EMAIL= # example@example.com
+JWT= # full JWT
 
 PROXY_ALLOWED_NAMES= # (.$SERVER_NAME .$DOMAIN_NAME ".bing.com")
 PROXY_BYPASS_NAMES= # ("google.com")

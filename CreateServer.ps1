@@ -23,6 +23,10 @@ param(
     [Parameter(Mandatory=$true)]
     [string]$GroupName,
     [Parameter(Mandatory=$false)]
+    [switch]$NoProxy,
+    [Parameter(Mandatory=$false)]
+    [switch]$UseEnterpriseCa,
+    [Parameter(Mandatory=$false)]
     [switch]$Delete
 )
 
@@ -144,16 +148,45 @@ Function Delete-SSHKeys{
     }
 }
 
+Function Get-Jwt {
+    # This is a big hack since the Graph Powershell SDK doesn't expose the JWT
+    # Get the assembly where the token cache is stored
+    $asm = [System.AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName.StartsWith("Microsoft.Graph.Authentication.Core") }
+    # Get the cached access token
+    $cache = ([System.Text.Encoding]::Utf8.GetString($asm.GetType("Microsoft.Graph.PowerShell.Authentication.TokenCache.TokenCacheStorage").GetMethod("GetToken").Invoke($null, (Get-MgContext))) | ConvertFrom-Json).AccessToken
+    # Step down one property to actually get the JWT
+    return $cache."$($cache.PSObject.Properties.Name)".secret
+}
+
 Function Stage-SetupScript {
     try{
         Write-Header "Generating setup script..."
-        Set-Content -Path "./Setup.sh" -Value "export intune_env=$Environment; ./InstallServer.sh --email ""$email"" --domain ""$FQDN""" -Force
+        $JWT = Get-Jwt
+        $ServerName = $FQDN.Split('.')[0]
+        $Content = @"
+        export intune_env=$Environment;
+        git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
+        cd TunnelTestEnv
+        chmod +x envSetup.sh
+        PUBLIC_IP=`$(curl ifconfig.me)
+        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/JWT=/JWT=$JWT/" vars
+        ./envSetup.sh -i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})
+"@
+        Set-Content -Path "./Setup.sh" -Value $Content -Force
         Write-Header "Copying setup script to remote server..."
-        scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./InstallServer.sh ./Setup.sh "$($username)@$($FQDN):~/" > $null
+        scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./Setup.sh "$($username)@$($FQDN):~/" > $null
+
+        Write-Header "Marking setup scripts as executable..."
+        ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "chmod +x ~/Setup.sh"
     }
     finally {
         Remove-Item "./Setup.sh"
     }
+}
+
+Function Run-SetupScript {
+    Write-Header "Connecting into remote server..."
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)"
 }
 
 Function Create-TunnelConfiguration {
@@ -421,11 +454,15 @@ Function Create-Flow {
     Create-VM
     Create-NetworkRules
     Move-SSHKeys
-    #Stage-SetupScript
-    CreateOrUpdate-ADApplication
 
     Create-TunnelConfiguration
     Create-TunnelSite
+
+    Stage-SetupScript
+    #Run-SetupScript
+
+    CreateOrUpdate-ADApplication
+
     Create-IosAppProtectionPolicy
     Create-IosAppConfigurationPolicy
     Logout
@@ -450,10 +487,3 @@ if ($Delete) {
 } else {
     Create-Flow
 }
-
-# Write-Header "Marking setup scripts as executable..."
-# ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($fqdns)" "chmod +x ~/InstallServer.sh"
-# ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($fqdns)" "chmod +x ~/Setup.sh"
-
-# Write-Header "Connecting into remote server..."
-# ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($fqdns)"
