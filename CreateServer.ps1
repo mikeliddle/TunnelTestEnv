@@ -169,7 +169,7 @@ Function Stage-SetupScript {
         cd TunnelTestEnv
         chmod +x envSetup.sh
         PUBLIC_IP=`$(curl ifconfig.me)
-        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/JWT=/JWT=$JWT/" vars
+        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/JWT=/JWT=$JWT/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         ./envSetup.sh -i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})
 "@
         Set-Content -Path "./Setup.sh" -Value $Content -Force
