@@ -313,17 +313,8 @@ BuildAndRunWebService() {
 #                                                                                         #
 ###########################################################################################
 InstallTunnelAppliance() {
-    # Touch EULA
-    touch /etc/mstunnel/EulaAccepted
-
-    # Download the installation script 
-    wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
-    chmod +x ./mstunnel-setup
-
     # Install
-    ./mstunnel "$TENANT_ADMIN" "$TENANT_PASSWORD" "$SITE_ID" "$CONFIG_ID"
-    export mst_no_prompt=1
-    ./mstunnel-setup
+    mst_no_prompt=1 ./mstunnel-setup
 }
 
 SetupTunnelPrereqs() {
@@ -331,6 +322,11 @@ SetupTunnelPrereqs() {
     mkdir -p /etc/mstunnel
     mkdir -p /etc/mstunnel/certs
     mkdir -p /etc/mstunnel/private
+    
+    # Touch EULA
+    touch /etc/mstunnel/EulaAccepted
+
+    cp agent-info.json /etc/mstunnel/agent-info.json
 }
 
 ###########################################################################################
@@ -355,6 +351,7 @@ SetupTunnelCerts() {
     # put the certs in place
     cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
     cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
+    cp agent.p12 /etc/mstunnel/private/agent.p12
 }
 
 ###########################################################################################

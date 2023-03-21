@@ -64,7 +64,8 @@ Function Login {
     
     Write-Header "Logging into graph..."
     Write-Header "Select the account to manage the profiles."
-    Connect-MgGraph -Scopes "Group.ReadWrite.All", "DeviceManagementConfiguration.ReadWrite.All", "DeviceManagementApps.ReadWrite.All", "Application.ReadWrite.All" | Out-Null
+    $script:JWT = dotnet run mstunnel.dll JWT $TenantAdmin $TenantPassword
+    Connect-MgGraph -AccessToken $script:JWT | Out-Null
     
     # Switch to beta since most of our endpoints are there
     Select-MgProfile -Name "beta"    
@@ -124,7 +125,7 @@ Function Create-VM {
 Function Create-NetworkRules {
     Write-Header "Creating network rules..."
     az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 80 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
+    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 80 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
 Function Move-SSHKeys{
@@ -148,20 +149,9 @@ Function Delete-SSHKeys{
     }
 }
 
-Function Get-Jwt {
-    # This is a big hack since the Graph Powershell SDK doesn't expose the JWT
-    # Get the assembly where the token cache is stored
-    $asm = [System.AppDomain]::CurrentDomain.GetAssemblies() | Where-Object { $_.FullName.StartsWith("Microsoft.Graph.Authentication.Core") }
-    # Get the cached access token
-    $cache = ([System.Text.Encoding]::Utf8.GetString($asm.GetType("Microsoft.Graph.PowerShell.Authentication.TokenCache.TokenCacheStorage").GetMethod("GetToken").Invoke($null, (Get-MgContext))) | ConvertFrom-Json).AccessToken
-    # Step down one property to actually get the JWT
-    return $cache."$($cache.PSObject.Properties.Name)".secret
-}
-
 Function Stage-SetupScript {
     try{
         Write-Header "Generating setup script..."
-        $JWT = Get-Jwt
         $ServerName = $FQDN.Split('.')[0]
         $Content = @"
         export intune_env=$Environment;
@@ -172,11 +162,13 @@ Function Stage-SetupScript {
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
         ./setup-expect.sh
-        expect ./setup.exp
+        expect -f ./setup.exp
 "@
         Set-Content -Path "./Setup.sh" -Value $Content -Force
         Write-Header "Copying setup script to remote server..."
         scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./Setup.sh "$($username)@$($FQDN):~/" > $null
+        scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./agent.p12 "$($username)@$($FQDN):~/" > $null
+        scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./agent-info.json "$($username)@$($FQDN):~/" > $null
 
         Write-Header "Marking setup scripts as executable..."
         ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "chmod +x ~/Setup.sh"
@@ -188,7 +180,7 @@ Function Stage-SetupScript {
 
 Function Run-SetupScript {
     Write-Header "Connecting into remote server..."
-    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)"
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo ./Setup.sh"
 }
 
 Function Create-TunnelConfiguration {
@@ -448,6 +440,10 @@ Function Delete-IosAppConfigurationPolicy{
     }
 }
 
+Function Create-TunnelAgent{
+    dotnet run mstunnel.dll Agent $TenantAdmin $TenantPassword $Site.Id
+}
+
 Function Create-Flow {
     Check-Prerequisites
     Login
@@ -457,11 +453,13 @@ Function Create-Flow {
     Create-NetworkRules
     Move-SSHKeys
 
+    Create-TunnelAgent
+
     Create-TunnelConfiguration
     Create-TunnelSite
 
     Stage-SetupScript
-    #Run-SetupScript
+    Run-SetupScript
 
     CreateOrUpdate-ADApplication
 

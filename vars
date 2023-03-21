@@ -3,7 +3,6 @@ DOMAIN_NAME= # example.com
 SERVER_PUBLIC_IP= # 20.x.x.x
 
 EMAIL= # example@example.com
-JWT= # full JWT
 SITE_ID= # Id of Tunnel Site
 
 PROXY_ALLOWED_NAMES= # (.$SERVER_NAME .$DOMAIN_NAME ".bing.com")
