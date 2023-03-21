@@ -20,18 +20,22 @@ param(
     [string]$ADApplication = "Generated MAM Tunnel",
     [Parameter(Mandatory=$false)]
     [string[]]$BundleIds = $null,
+    [Parameter(Mandatory=$true)]
+    [string]$GroupName,
     [Parameter(Mandatory=$false)]
     [switch]$Delete
 )
 
 $script:Account = $null
 $script:Subscription = $null
-$script:Group = $null
+$script:ResourceGroup = $null
 $script:SSHKeyPath = $null
 $script:FQDN = $null
 $script:ServerConfiguration = $null
 $script:Site = $null
 $script:App = $null
+$script:Group = $null
+$script:AppProtectionPolicy = $null
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -55,7 +59,7 @@ Function Login {
     
     Write-Header "Logging into graph..."
     Write-Header "Select the account to manage the profiles."
-    Connect-MgGraph -Scopes "DeviceManagementConfiguration.ReadWrite.All", "Application.ReadWrite.All" | Out-Null
+    Connect-MgGraph -Scopes "Group.ReadWrite.All", "DeviceManagementConfiguration.ReadWrite.All", "DeviceManagementApps.ReadWrite.All", "Application.ReadWrite.All" | Out-Null
     
     # Switch to beta since most of our endpoints are there
     Select-MgProfile -Name "beta"    
@@ -75,42 +79,47 @@ Function Detect-Variables {
         Write-Host "Detected your email as '$Email'"
     }
 
-    $script:Group = "$VmName-group"
+    $script:ResourceGroup = "$VmName-group"
     $script:SSHKeyPath = "~/.ssh/$VmName"
+    $script:Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
+    if (-Not $Group) {
+        Write-Error "Could not find group named '$GroupName'"
+        Exit 1
+    }
 }
 
 Function Create-ResourceGroup {
-    Write-Header "Checking for group '$group'..."
-    if ([bool](az group show --name $group --subscription $Subscription 2> $null)) {
-        Write-Error "Group '$group' already exists"
+    Write-Header "Checking for resource group '$resourceGroup'..."
+    if ([bool](az group show --name $resourceGroup --subscription $Subscription 2> $null)) {
+        Write-Error "Group '$resourceGroup' already exists"
         exit -1
     }
     
-    Write-Header "Creating group '$group'..."
-    $groupData = az group create --subscription $subscription --location $location --name $group --only-show-errors | ConvertFrom-Json
+    Write-Header "Creating resource group '$resourceGroup'..."
+    $groupData = az group create --subscription $subscription --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
 }
 
 Function Delete-ResourceGroup {
-    Write-Header "Checking for group '$group'..."
-    if ([bool](az group show --name $group --subscription $Subscription 2> $null)) {
-        Write-Header "Deleting group '$group'..."
-        az group delete --name $group --yes --no-wait
+    Write-Header "Checking for resource group '$resourceGroup'..."
+    if ([bool](az group show --name $resourceGroup --subscription $Subscription 2> $null)) {
+        Write-Header "Deleting resource group '$resourceGroup'..."
+        az group delete --name $resourceGroup --yes --no-wait
     } else {
-        Write-Host "Group '$group' does not exist"
+        Write-Host "Group '$resourceGroup' does not exist"
     }
 }
 
 Function Create-VM {
     Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --subscription $subscription --location $location --resource-group $group --name $VmName --image $Image --size $Size --generate-ssh-keys --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --subscription $subscription --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --generate-ssh-keys --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
     $script:FQDN = $vmdata.fqdns
     Write-Host "DNS is '$FQDN'"
 }
 
 Function Create-NetworkRules {
     Write-Header "Creating network rules..."
-    az network nsg rule create --subscription $subscription --resource-group $group --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-    az network nsg rule create --subscription $subscription --resource-group $group --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 80 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
+    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
+    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 80 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
 Function Move-SSHKeys{
@@ -267,6 +276,59 @@ Function CreateOrUpdate-ADApplication {
     }
 }
 
+Function Create-IosAppProtectionPolicy{
+    $DisplayName = "$VmName-Protection"
+    $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($AppProtectionPolicy) {
+        Write-Header "Already found App Protection policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating App Protection policy '$DisplayName'..."
+        $script:AppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
+        Write-Header "Targeting bundles to '$DisplayName'..."
+        $targetedApps = $BundleIds | ForEach-Object { 
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.iosMobileAppIdentifier"
+                    bundleId = $_
+                }
+            }
+        }
+        $body = @{
+            apps = $targetedApps
+            appGroupType = "selectedPublicApps"
+        } | ConvertTo-Json -Depth 10
+        
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($AppProtectionPolicy.Id)')/targetApps" -Body $Body
+
+        $Body = @{
+            assignments = @(
+                @{
+                    target = @{
+                        groupId = $Group.Id
+                        deviceAndAppManagementAssignmentFilterId = $null
+                        deviceAndAppManagementAssignmentFilterType = "none"
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                }
+            )
+        } | ConvertTo-Json -Depth 10
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($AppProtectionPolicy.Id)')/assign" -Body $Body
+    }
+}
+
+Function Delete-IosAppProtectionPolicy{
+    $DisplayName = "$VmName-Protection"
+    Write-Header "Deleting App Protection Policy '$DisplayName'..."
+    $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    if($AppProtectionPolicy) {
+        Remove-MgDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $AppProtectionPolicy.Id
+    } else {
+        Write-Host "App Protection Policy '$DisplayName' does not exist."
+    }
+}
+
 Function Create-Flow {
     Check-Prerequisites
     Login
@@ -277,8 +339,10 @@ Function Create-Flow {
     Move-SSHKeys
     #Stage-SetupScript
     CreateOrUpdate-ADApplication
+
     Create-TunnelConfiguration
     Create-TunnelSite
+    Create-IosAppProtectionPolicy
     Logout
 }
 
@@ -288,10 +352,13 @@ Function Delete-Flow {
     Detect-Variables
     Delete-ResourceGroup
     Delete-SSHKeys
+
+    Delete-IosAppProtectionPolicy
     Delete-TunnelSite
     Delete-TunnelConfiguration
     Logout
 }
+
 
 if ($Delete) {
     Delete-Flow
