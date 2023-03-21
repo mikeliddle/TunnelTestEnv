@@ -167,10 +167,12 @@ Function Stage-SetupScript {
         export intune_env=$Environment;
         git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
         cd TunnelTestEnv
-        chmod +x envSetup.sh
+        chmod +x setup.sh setup.exp envSetup.sh exportCert.sh 
         PUBLIC_IP=`$(curl ifconfig.me)
-        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/JWT=/JWT=$JWT/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
-        ./envSetup.sh -i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})
+        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
+        export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
+        ./setup-expect.sh
+        expect ./setup.exp
 "@
         Set-Content -Path "./Setup.sh" -Value $Content -Force
         Write-Header "Copying setup script to remote server..."

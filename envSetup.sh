@@ -116,6 +116,8 @@ ReplaceNames() {
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" proxy/etc/squid/squid.conf
+
+    sed -i "s/##SITE_ID##/${SITE_ID}/g" setup.exp
 }
 
 ###########################################################################################
@@ -319,7 +321,9 @@ InstallTunnelAppliance() {
     chmod +x ./mstunnel-setup
 
     # Install
-    mst_no_prompt=1 ./mstunnel-setup
+    ./mstunnel "$TENANT_ADMIN" "$TENANT_PASSWORD" "$SITE_ID" "$CONFIG_ID"
+    export mst_no_prompt=1
+    ./mstunnel-setup
 }
 
 SetupTunnelPrereqs() {
