@@ -14,7 +14,7 @@ LogWarning() {
 
 InstallPrereqs() {
     LogInfo "installing container runtime"
-    $update_command > install.log 2>&1
+    $update_command >> install.log 2>&1
     $installer install -y $ctr_package_name >> install.log 2>&1
     $installer install -y jq >> install.log 2>&1
 
@@ -174,7 +174,7 @@ ConfigureCerts() {
     cd /etc/pki/tls
 
     # generate self-signed root CA
-    openssl genrsa -out private/cakey.pem 4096 > certs.log 2>&1
+    openssl genrsa -out private/cakey.pem 4096 >> certs.log 2>&1
     openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
         -out certs/cacert.pem >> certs.log 2>&1
 
@@ -447,6 +447,11 @@ SetupEnterpriseCerts() {
 SetupTunnelCerts() {
     # put the certs in place
     cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup LetsEncrypt certs"
+        exit 1
+    fi
+
     cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
     
     if [ $? -ne 0 ]; then
@@ -539,6 +544,11 @@ DetectEnvironment() {
         installer="dnf"
         update_command="dnf -y update"
         ctr_package_name="@container-tools"
+        # open up port 443
+        firewall-cmd --zone=public --add-port=443/tcp
+        firewall-cmd --zone=public --add-port=443/udp
+        firewall-cmd --zone=public --permanent --add-port=443/tcp
+        firewall-cmd --zone=public --permanent --add-port=443/udp
     fi
 }
 

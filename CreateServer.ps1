@@ -20,7 +20,7 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Size = "Standard_B1s",
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"Canonical:UbuntuServer:18.04-LTS:18.04.202106220"
+    [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$ADApplication = "Generated MAM Tunnel",
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -190,6 +190,17 @@ Function Initialize-SetupScript {
         $ServerName = $FQDN.Split('.')[0]
         $Content = @"
         export intune_env=$Environment;
+
+        if [ -f "/etc/debian_version" ]; then
+            # debian
+            installer="apt-get"
+        else
+            # RHEL
+            installer="dnf"
+        fi
+
+        `$installer install -y git
+
         git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
         cd TunnelTestEnv
 

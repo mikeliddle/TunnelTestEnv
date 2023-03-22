@@ -12,5 +12,5 @@ fi
 sed -i "s/##SITE_ID##/${SITE_ID}/g" setup.exp
 sed -i "s/##ARGS##/${SETUP_ARGS}/g" setup.exp
 
-$installer -y update
-$installer install -y expect
+$installer -y update >> install.log 2>&1
+$installer install -y expect  >> install.log 2>&1
