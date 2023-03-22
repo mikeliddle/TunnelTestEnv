@@ -2,38 +2,63 @@
 param(
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
     [Parameter(Mandatory=$true, ParameterSetName="Delete")]
+    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
     [string]$VmName,
+
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
     [string[]]$BundleIds,
+
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
     [string]$GroupName,
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [ValidateSet("PE","SelfHost","OneDF")]
     [string]$Environment="PE",
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Email="",
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string]$Username="azureuser",
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Size = "Standard_B1s",
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
+    
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string]$ADApplication = "Generated MAM Tunnel",
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [switch]$NoProxy,
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [switch]$UseEnterpriseCa,
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [pscredential]$TenantCredential,
+
     [Parameter(Mandatory=$true, ParameterSetName="Delete")]
     [switch]$Delete,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
+    [switch]$ProfilesOnly,
+
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [switch]$StayLoggedIn
 )
 
@@ -48,6 +73,7 @@ $script:App = $null
 $script:Group = $null
 $script:AppProtectionPolicy = $null
 $script:AppConfigurationPolicy = $null
+$script:TrustedRootPolicy = $null
 $script:Platform = ""
 
 Function Write-Header([string]$Message) {
@@ -76,8 +102,10 @@ Function Test-Prerequisites {
 }
 
 Function Login {
-    Write-Header "Select the account to manage the VM."
-    az login --only-show-errors | Out-Null
+    if (-Not $ProfilesOnly) {
+        Write-Header "Select the account to manage the VM."
+        az login --only-show-errors | Out-Null
+    }
     
     Write-Header "Logging into graph..."
 
@@ -188,6 +216,7 @@ Function Initialize-SetupScript {
     try{
         Write-Header "Generating setup script..."
         $ServerName = $FQDN.Split('.')[0]
+        $GitBranch = git branch --show-current
         $Content = @"
         export intune_env=$Environment;
 
@@ -201,7 +230,7 @@ Function Initialize-SetupScript {
 
         `$installer install -y git
 
-        git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
+        git clone --single-branch --branch $GitBranch https://github.com/mikeliddle/TunnelTestEnv.git
         cd TunnelTestEnv
 
         cp ../agent.p12 .
@@ -447,6 +476,45 @@ Function Remove-IosAppProtectionPolicy{
     }
 }
 
+Function New-IosTrustedRootPolicy {
+    $DisplayName = "$VmName-TrustedRoot"
+    $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if($TrustedRootPolicy) {
+        Write-Header "Already found Trusted Root policy named '$DisplayName'"
+    } else {
+        $cerFileName = "./$([System.Guid]::NewGuid().ToString())$VmName.pem"
+        try{
+            Write-Header "Copying root certificate locally..."
+            scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN):/etc/pki/tls/certs/cacert.pem" $cerFileName > $null 
+            $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----","").Replace("-----END CERTIFICATE-----","") -join ""
+            
+            $Body = @{
+                "@odata.type" = "#microsoft.graph.iosTrustedRootCertificate"
+                displayName = $DisplayName
+                id = [System.Guid]::Empty.ToString()
+                roleScopeTagIds = @("0")
+                trustedRootCertificate = $certValue
+            } | ConvertTo-Json -Depth 10
+
+            Write-Header "Creating Trusted Root Policy..."
+            $script:TrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+        } finally {
+            Remove-Item $cerFileName
+        } 
+    }                     
+}
+
+Function Remove-IosTrustedRootPolicy{
+    $DisplayName = "$VmName-TrustedRoot"
+    Write-Header "Deleting Trusted Root Policy '$DisplayName'..."
+    $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if($TrustedRootPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $TrustedRootPolicy.Id
+    } else {
+        Write-Host "Trusted Root Policy '$DisplayName' does not exist."
+    }
+}
+
 Function New-IosAppConfigurationPolicy{
     $DisplayName = "$VmName-Configuration"
     $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
@@ -471,7 +539,27 @@ Function New-IosAppConfigurationPolicy{
                 name="com.microsoft.tunnel.server_address"
                 value="$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
             }
+            @{
+                name="com.microsoft.tunnel.trusted_root_certificates"
+                value= (@(
+                    @{
+                        "@odata.type" = $TrustedRootPolicy.AdditionalProperties."@odata.type"
+                        id = $TrustedRootPolicy.Id
+                        displayName = $TrustedRootPolicy.DisplayName
+                        lastModifiedDateTime = $TrustedRootPolicy.LastModifiedDateTime
+                        trustedRootCertificate = $TrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                    }
+                ) | ConvertTo-Json -Depth 10 -AsArray)
+            }
         )
+
+        if (-Not $NoProxy){
+            $customSettings += @(@{
+                name="com.microsoft.tunnel.proxy_pacurl"
+                value="http://$($Site.PublicAddress)/tunnel.pac"
+            })
+        }
+
         $targetedApps = $BundleIds | ForEach-Object { 
             @{
                 mobileAppIdentifier = @{
@@ -558,6 +646,7 @@ Function Create-Flow {
     
     Update-ADApplication
 
+    New-IosTrustedRootPolicy
     New-IosAppProtectionPolicy
     New-IosAppConfigurationPolicy
     Logout
@@ -567,19 +656,40 @@ Function Delete-Flow {
     Test-Prerequisites
     Login
     Initialize-Variables
+    
     Remove-ResourceGroup
     Remove-SSHKeys
 
     Remove-IosAppConfigurationPolicy
     Remove-IosAppProtectionPolicy
+    Remove-IosTrustedRootPolicy
     Remove-TunnelServers
     Remove-TunnelSite
     Remove-TunnelConfiguration
     Logout
 }
 
-if ($Delete) {
-    Delete-Flow
+Function ProfilesOnly-Flow {
+    Test-Prerequisites
+    Login
+    Initialize-Variables
+
+    New-TunnelConfiguration
+    New-TunnelSite
+
+    Update-ADApplication
+    New-IosTrustedRootPolicy
+    New-IosAppProtectionPolicy
+    New-IosAppConfigurationPolicy
+    Logout
+}
+
+if ($ProfilesOnly) {
+    ProfilesOnly-Flow
 } else {
-    Create-Flow
+    if ($Delete) {
+        Delete-Flow
+    } else {
+        Create-Flow
+    }
 }
