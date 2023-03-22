@@ -1,21 +1,57 @@
 #!/bin/bash
 
-InstallPrereqs() {
-    echo "installing Docker"
-    apt update > run.log 2>&1
-    apt remove -y docker >>  run.log 2>&1
-    apt install -y docker.io >> run.log 2>&1
+LogInfo() {
+    echo -e "\e[0;36m$1\e[0m"
+}
 
-    echo "disabling resolved.service"
+LogError() {
+    echo -e "\e[0;31m$1\e[0m"
+}
+
+LogWarning() {
+    echo -e "\e[0;33m$1\e[0m"
+}
+
+InstallPrereqs() {
+    LogInfo "installing Docker"
+    apt update > install.log 2>&1
+    apt remove -y docker >>  install.log 2>&1
+    apt install -y docker.io >> install.log 2>&1
+    apt install -y jq >> install.log 2>&1
+
+    docker --version > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        LogError "Missing Docker... aborting"
+        exit 1
+    fi
+
+    LogInfo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
     ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
     systemctl stop systemd-resolved
 
+    LogInfo "pulling mst-readiness and mstunnel-setup"
+    wget -q aka.ms/mst-readiness 
+    [ $? -ne 0 ] && exit
+    chmod +x mst-readiness
+
+    wget -q --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
+    [ $? -ne 0 ] && exit
+    chmod +x ./mstunnel-setup
+
+
+    LogInfo "setting up acme.sh"
+    git submodule update --init
 	cd acme.sh
     
-	./acme.sh --install -m $EMAIL
+	./acme.sh --install -m $EMAIL >> install.log
 	
+    if [ $? -ne 0 ]; then
+        LogError "acme.sh not properly setup... aborting"
+        exit 1
+    fi
+
 	cd ..
 }
 
@@ -46,7 +82,7 @@ Help() {
 }
 
 Uninstall() {
-    echo "removing docker containers"
+    LogInfo "removing docker containers"
 	docker stop nginx
 	docker rm nginx
 
@@ -59,14 +95,14 @@ Uninstall() {
     docker stop proxy
     docker rm proxy
 
-    echo "removing docker volumes"
+    LogInfo "removing docker volumes"
     docker volume rm nginx-vol
     docker volume rm unbound
 
-    echo "removing /etc/pki/tls folder"
+    LogInfo "removing /etc/pki/tls folder"
     rm -rf /etc/pki/tls
 
-    echo "uninstalling tunnel"
+    LogInfo "uninstalling tunnel"
     mst-cli uninstall
 
     git reset --hard
@@ -76,34 +112,34 @@ Uninstall() {
 
 VerifyEnvironmentVars() {
     if [ -z $SERVER_NAME ]; then
-        echo "MISSING SERVER NAME... Aborting."
+        LogError "MISSING SERVER NAME... Aborting."
         fail=1
     fi
     if [ -z $DOMAIN_NAME ]; then
-        echo "MISSING DOMAIN NAME... Aborting."
+        LogError "MISSING DOMAIN NAME... Aborting."
         fail=1
     fi
     if [ -z $SERVER_PUBLIC_IP ]; then
-        echo "MISSING PUBLIC IP... Aborting."
+        LogError "MISSING PUBLIC IP... Aborting."
         fail=1
     fi
     if [ -z $EMAIL ]; then
-        echo "MISSING EMAIL... Aborting."
+        LogError "MISSING EMAIL... Aborting."
         fail=1
     fi
     if [ -z $PROXY_ALLOWED_NAMES ]; then
-        echo "MISSING PROXY ALLOWED NAMES, no urls will be allowed through the proxy."
+        LogWarning "MISSING PROXY ALLOWED NAMES, no urls will be allowed through the proxy."
     fi
     if [ -z $PROXY_BYPASS_NAMES ]; then
-        echo "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
+        LogWarning "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
     fi
     if [ $fail ]; then
-        exit
+        exit 1
     fi
 }
 
 ReplaceNames() {
-    echo "Injecting Environment variables"
+    LogInfo "Injecting Environment variables"
 
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
@@ -118,15 +154,20 @@ ReplaceNames() {
 ###########################################################################################
 
 ConfigureCerts() {
-    echo "configuring certs"
+    LogInfo "configuring certs"
     # push current directory
     current_dir=$(pwd)
 
     # setup PKI folder structure
-    mkdir /etc/pki/tls
-    mkdir /etc/pki/tls/certs
-    mkdir /etc/pki/tls/req
-    mkdir /etc/pki/tls/private
+    mkdir -p /etc/pki/tls
+    mkdir -p /etc/pki/tls/certs
+    mkdir -p /etc/pki/tls/req
+    mkdir -p /etc/pki/tls/private
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup pki directory structure"
+        exit 1
+    fi
     
     # copy config into the tls folder structure
     cp openssl.conf.d/* /etc/pki/tls
@@ -134,31 +175,51 @@ ConfigureCerts() {
     cd /etc/pki/tls
 
     # generate self-signed root CA
-    openssl genrsa -out private/cakey.pem 4096
+    openssl genrsa -out private/cakey.pem 4096 > certs.log 2>&1
     openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
-        -out certs/cacert.pem 
+        -out certs/cacert.pem >> certs.log 2>&1
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup CA cert"
+        exit 1
+    fi
 
     # generate leaf from our CA
-    openssl genrsa -out private/server.key 4096
-    openssl req -new -key private/server.key -out req/server.csr -config openssl.conf
+    openssl genrsa -out private/server.key 4096 >> certs.log 2>&1
+    openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
-        -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf
+        -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup Leaf cert"
+        exit 1
+    fi
 
     # generate untrusted leaf cert
     openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out \
-        certs/untrusted.pem -keyout private/untrusted.key
+        certs/untrusted.pem -keyout private/untrusted.key >> certs.log 2>&1
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup Self-Signed cert"
+        exit 1
+    fi
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
-		/root/.acme.sh/acme.sh --upgrade
-		/root/.acme.sh/acme.sh --set-default-ca --server letsencrypt
-		/root/.acme.sh/acme.sh --register-account
+		/root/.acme.sh/acme.sh --upgrade  >> certs.log 2>&1
+		/root/.acme.sh/acme.sh --set-default-ca --server letsencrypt  >> certs.log 2>&1
+		/root/.acme.sh/acme.sh --register-account  >> certs.log 2>&1
 
-		/root/.acme.sh/acme.sh --upgrade --update-account --accountemail $EMAIL
+		/root/.acme.sh/acme.sh --upgrade --update-account --accountemail $EMAIL  >> certs.log 2>&1
 
-		/root/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"
+		/root/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"  >> certs.log 2>&1
 
-		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem
-		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key
+		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem  >> certs.log 2>&1
+		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key  >> certs.log 2>&1
+
+        if [ $? -ne 0 ]; then
+            LogError "Failed to setup LetsEncrypt cert"
+            exit 1
+        fi
     fi
 
     cd $current_dir
@@ -166,8 +227,9 @@ ConfigureCerts() {
 }
 
 ConfigureUnbound() {
+    LogInfo "Setting up private DNS server"
     # create the unbound volume
-    docker volume create unbound
+    docker volume create unbound > unbound.log
 
     # run the unbound container
     docker run -d \
@@ -176,19 +238,26 @@ ConfigureUnbound() {
         -p 53:53/tcp \
         -p 53:53/udp \
         --restart=unless-stopped \
-        mvance/unbound:latest
+        mvance/unbound:latest >> unbound.log 2>&1
 
     # copy in necessary config files
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
     # restart to apply config change
-    docker restart unbound
+    docker restart unbound >> unbound.log 2>&1
 
     UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+
+    UNBOUND_HEALTH=$(docker container inspect -f "{{ .State.Status }}" unbound)
+    if [ "$UNBOUND_HEALTH" != "running" ]; then
+        LogError "Failed to setup DNS server container"
+        exit 1
+    fi
 }
 
 ConfigureNginx() {
+    LogInfo "Setting up private web server container"
     # create volume
-    docker volume create nginx-vol
+    docker volume create nginx-vol > nginx.log
 
     # copy config files, certs, and pages to serve up
     cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
@@ -202,14 +271,20 @@ ConfigureNginx() {
 		--mount source=nginx-vol,destination=/etc/volume \
 		--restart=unless-stopped \
 		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
-		nginx
+		nginx >> nginx.log 2>&1
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
 
     cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
 
-    docker restart nginx
+    docker restart nginx >> nginx.log 2>&1
+
+    NGINX_HEALTH=$(docker container inspect -f "{{ .State.Status }}" nginx)
+    if [ "$NGINX_HEALTH" != "running" ]; then
+        LogError "Failed to setup web server container"
+        exit 1
+    fi
 }
 
 ###########################################################################################
@@ -219,6 +294,8 @@ ConfigureNginx() {
 ###########################################################################################
 
 BuildAndRunProxy() {
+    LogInfo "Setting up squid proxy container"
+
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
     UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
 
@@ -226,19 +303,19 @@ BuildAndRunProxy() {
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
 
     for pan in "${PROXY_BYPASS_NAMES[@]}"; do
-        echo "Proxy bypass name: $pan"
+        LogInfo "Proxy bypass name: $pan"
         panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile 
+    docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile > proxy.log
     docker run -d \
             --name proxy \
             --restart always \
             --volume /etc/squid \
             --dns "$UNBOUND_IP" \
             --dns-search "$DOMAIN_NAME" \
-            ubuntu:squid
+            ubuntu:squid >> proxy.log 2>&1
 
     PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
@@ -246,14 +323,20 @@ BuildAndRunProxy() {
     cp nginx_data/tunnel.pac /var/lib/docker/volumes/nginx-vol/_data/data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
     cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
-    docker restart unbound
+    docker restart unbound >> proxy.log 2>&1
 
-    docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf
-    docker restart proxy
+    docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
+    docker restart proxy >> proxy.log 2>&1
+
+    PROXY_HEALTH=$(docker container inspect -f "{{ .State.Status }}" proxy)
+    if [ "$PROXY_HEALTH" != "running" ]; then
+        LogError "Failed to setup proxy container"
+        exit 1
+    fi
 }
 
 PrintConf() {
-    echo "=================== Use the following to configure Microsoft Tunnel Server ======================="
+    echo -e "\e[0;32m=================== Use the following to configure Microsoft Tunnel Server ======================="
     echo "DNS server: $UNBOUND_IP"
 
     if [[ $INSTALL_PROXY ]]; then
@@ -270,7 +353,7 @@ PrintConf() {
     echo "  https://untrusted.${DOMAIN_NAME}"
     echo "  https://webapp.${DOMAIN_NAME}"
     echo "  http://${DOMAIN_NAME}"
-    echo "=================================================================================================="
+    echo -e "==================================================================================================\e[0m"
 }
 
 ###########################################################################################
@@ -280,22 +363,29 @@ PrintConf() {
 ###########################################################################################
 
 BuildAndRunWebService() {
+    LogInfo "Setting up .NET web service"
     current_dir=$(pwd)
 
     cd sampleWebService
 
-    docker build -t samplewebservice .
+    docker build -t samplewebservice . > webService.log
 
     docker run -d \
         --name=webService \
         --restart=unless-stopped \
         -p 80:80 \
-        samplewebservice
+        samplewebservice >> webService.log 2>&1
 
     cd $current_dir
 
     WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
+
+    WEBSERVICE_HEALTH=$(docker container inspect -f "{{ .State.Status }}" webService)
+    if [ "$WEBSERVICE_HEALTH" != "running" ]; then
+        LogError "Failed to setup .NET server container"
+        exit 1
+    fi
 }
 
 ###########################################################################################
@@ -304,22 +394,27 @@ BuildAndRunWebService() {
 #                                                                                         #
 ###########################################################################################
 InstallTunnelAppliance() {
-    # Touch EULA
-    touch /etc/mstunnel/EulaAccepted
-
-    # Download the installation script 
-    wget --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
-    chmod +x ./mstunnel-setup
-
     # Install
-    ./mstunnel-setup
+    LogInfo "Installing Tunnel"
+    mst_no_prompt=1 ./mstunnel-setup
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to install Tunnel"
+        exit 1
+    fi
 }
 
 SetupTunnelPrereqs() {
     # make the correct directories
-    mkdir /etc/mstunnel
-    mkdir /etc/mstunnel/certs
-    mkdir /etc/mstunnel/private
+    mkdir -p /etc/mstunnel
+    mkdir -p /etc/mstunnel/certs
+    mkdir -p /etc/mstunnel/private
+    
+    # Touch EULA
+    touch /etc/mstunnel/EulaAccepted
+
+    # recoverable, you'll need to interact though.
+    cp agent-info.json /etc/mstunnel/agent-info.json > /dev/null 2>&1
 }
 
 ###########################################################################################
@@ -331,19 +426,37 @@ SetupEnterpriseCerts() {
     # put the certs in place
     # no need using a different server cert, just need to reformat it.
     cp /etc/pki/tls/certs/server.pem /etc/pki/tls/certs/tunnel.pem
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup leaf cert"
+        exit 1
+    fi
+
     cat /etc/pki/tls/certs/cacert.pem >> /etc/pki/tls/certs/tunnel.pem
 
     cp /etc/pki/tls/certs/tunnel.pem /etc/mstunnel/certs/site.crt    
     cp /etc/pki/tls/private/server.key /etc/mstunnel/private/site.key
 
-    echo "Make sure this root certificate is uploaded to Intune and targeted properly"
-    cat /etc/pki/tls/certs/cacert.pem
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup certs"
+        exit 1
+    fi
+
+    LogWarning "Make sure this root certificate is uploaded to Intune and targeted properly"
 }
 
 SetupTunnelCerts() {
     # put the certs in place
     cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
     cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup LetsEncrypt certs"
+        exit 1
+    fi
+
+    # recoverable by tunnel, don't bail here.
+    cp agent.p12 /etc/mstunnel/private/agent.p12 > /dev/null 2>&1
 }
 
 ###########################################################################################
@@ -371,7 +484,7 @@ Update(){
 
     NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
     if [ "${NGINX_INITIAL_IP}" != "${NGINX_IP}" ]; then
-        echo "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
+        LogWarning "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
     fi
 
     # Next do the webapp
@@ -382,7 +495,7 @@ Update(){
 
     WEBAPP_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
     if [ "${WEBAPP_INITIAL_IP}" != "${WEBAPP_IP}" ]; then
-        echo "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
+        LogWarning "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
     fi
 
     # next the proxy?
@@ -395,7 +508,7 @@ Update(){
 
         PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
         if [ "${PROXY_INITIAL_IP}" != "${PROXY_IP}" ]; then
-            echo "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
+            LogWarning "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
         fi
     fi
 
@@ -408,7 +521,7 @@ Update(){
 
     UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
     if [ "$UNBOUND_INITIAL_IP" != "$UNBOUND_IP" ]; then
-        echo "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
+        LogWarning "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
     fi
 }
 
@@ -460,7 +573,7 @@ SetupTunnelPrereqs
 
 if [[ !$SKIP_CERT_GENERATION ]]; then
     ConfigureCerts
-    ./exportCert.sh
+    ./exportCert.sh  >> certs.log 2>&1
 fi
 
 if [[ $ENTERPRISE_CA ]]; then
