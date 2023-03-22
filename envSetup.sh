@@ -267,7 +267,7 @@ ConfigureNginx() {
         -v /etc/pki/tls/certs:/etc/volume/certs:ro \
         -v /etc/pki/tls/private:/etc/volume/private:ro \
         -v $(pwd)/nginx_data:/etc/volume/data:ro \
-		nginx >> nginx.log 2>&1
+		docker.io/library/nginx >> nginx.log 2>&1
 
     NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
