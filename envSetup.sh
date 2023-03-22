@@ -237,14 +237,14 @@ ConfigureUnbound() {
         -p 53:53/tcp \
         -p 53:53/udp \
         --restart=unless-stopped \
-        mvance/unbound:latest >> unbound.log 2>&1
+        docker.io/mvance/unbound:latest >> unbound.log 2>&1
 
     # copy in necessary config files
-    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
+    $ctr_cli cp unbound.conf.d/a-records.conf unbound:a-records.conf
     # restart to apply config change
     $ctr_cli restart unbound >> unbound.log 2>&1
 
-    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
 
     UNBOUND_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" unbound)
     if [ "$UNBOUND_HEALTH" != "running" ]; then
@@ -258,24 +258,19 @@ ConfigureNginx() {
     # create volume
     $ctr_cli volume create nginx-vol > nginx.log
 
-    # copy config files, certs, and pages to serve up
-    cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
-    cp -r /etc/pki/tls/certs /var/lib/docker/volumes/nginx-vol/_data/certs
-    cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
-    cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
-
 	# run the containers on the $ctr_cli subnet
 	$ctr_cli run -d \
 		--name=nginx \
 		--mount source=nginx-vol,destination=/etc/volume \
 		--restart=unless-stopped \
-		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
+		-v $(pwd)/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
+        -v /etc/pki/tls/certs:/etc/volume/certs:ro \
+        -v /etc/pki/tls/private:/etc/volume/private:ro \
+        -v $(pwd)/nginx_data:/etc/volume/data:ro \
 		nginx >> nginx.log 2>&1
 
-    NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
-
-    cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
 
     $ctr_cli restart nginx >> nginx.log 2>&1
 
@@ -296,7 +291,7 @@ BuildAndRunProxy() {
     LogInfo "Setting up squid proxy container"
 
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
-    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
@@ -316,12 +311,14 @@ BuildAndRunProxy() {
             --dns-search "$DOMAIN_NAME" \
             ubuntu:squid >> proxy.log 2>&1
 
-    PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+    PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
     sed -i "s/PROXY_URL/proxy.${DOMAIN_NAME}/g" nginx_data/tunnel.pac
-    cp nginx_data/tunnel.pac /var/lib/docker/volumes/nginx-vol/_data/data/tunnel.pac
+    
+    # $ctr_cli copy into nginx container
+    $ctr_cli cp nginx_data/tunnel.pac nginx:/etc/volume/data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
-    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
+    $ctr_cli cp unbound.conf.d/a-records.conf unbound:a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
 
     $ctr_cli cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
@@ -377,7 +374,7 @@ BuildAndRunWebService() {
 
     cd $current_dir
 
-    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 
     WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webService)
@@ -470,10 +467,10 @@ SetupTunnelCerts() {
 ###########################################################################################
 Update(){
     # capture initial state
-    NGINX_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
-    WEBAPP_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
-    PROXY_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
-    UNBOUND_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    NGINX_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
+    WEBAPP_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
+    PROXY_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
+    UNBOUND_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
     UNBOUND_IP="$UNBOUND_INITIAL_IP"
     
     # start with nginx
@@ -481,12 +478,12 @@ Update(){
     $ctr_cli rm nginx
     $ctr_cli volume rm nginx-vol
 
-    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
     
     ConfigureNginx
 
-    NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
     if [ "${NGINX_INITIAL_IP}" != "${NGINX_IP}" ]; then
         LogWarning "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
     fi
@@ -497,7 +494,7 @@ Update(){
 
     BuildAndRunWebService
 
-    WEBAPP_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    WEBAPP_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
     if [ "${WEBAPP_INITIAL_IP}" != "${WEBAPP_IP}" ]; then
         LogWarning "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
     fi
@@ -510,7 +507,7 @@ Update(){
 
         BuildAndRunProxy
 
-        PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+        PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
         if [ "${PROXY_INITIAL_IP}" != "${PROXY_IP}" ]; then
             LogWarning "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
         fi
@@ -523,7 +520,7 @@ Update(){
 
     ConfigureUnbound
 
-    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
     if [ "$UNBOUND_INITIAL_IP" != "$UNBOUND_IP" ]; then
         LogWarning "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
     fi
@@ -538,12 +535,14 @@ DetectEnvironment() {
         installer="apt-get"
         update_command="apt-get update"
         ctr_package_name="docker.io"
+        network_name="bridge"
     else
         # RHEL
         ctr_cli="podman"
         installer="dnf"
         update_command="dnf -y update"
         ctr_package_name="@container-tools"
+        network_name="podman"
         # open up port 443
         firewall-cmd --zone=public --add-port=443/tcp
         firewall-cmd --zone=public --add-port=443/udp
