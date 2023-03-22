@@ -152,7 +152,7 @@ Function Remove-ResourceGroup {
 
 Function New-VM {
     Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --subscription $subscription --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --generate-ssh-keys --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --subscription $subscription --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
     $script:FQDN = $vmdata.fqdns
     Write-Host "DNS is '$FQDN'"
 }
@@ -191,6 +191,7 @@ Function Initialize-SetupScript {
         $Content = @"
         export intune_env=$Environment;
         git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
+        git submodule update --init
         cd TunnelTestEnv
         chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
         PUBLIC_IP=`$(curl ifconfig.me)
@@ -489,14 +490,20 @@ Function New-TunnelAgent{
     }
 }
 
+Function New-SSHKeys{
+    Write-Header "Generating new RSA 4096 SSH Key"
+    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
+}
+
 Function Create-Flow {
     Test-Prerequisites
     Login
     Initialize-Variables
+    New-SSHKeys
     New-ResourceGroup
     New-VM
     New-NetworkRules
-    Move-SSHKeys
+    # Move-SSHKeys
 
     New-TunnelConfiguration
     New-TunnelSite
