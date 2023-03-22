@@ -27,6 +27,10 @@ param(
     [Parameter(Mandatory=$false)]
     [switch]$UseEnterpriseCa,
     [Parameter(Mandatory=$false)]
+    [switch]$TenantAdmin="",
+    [Parameter(Mandatory=$false)]
+    [switch]$TenantPassword="",
+    [Parameter(Mandatory=$false)]
     [switch]$Delete
 )
 
@@ -441,7 +445,7 @@ Function Delete-IosAppConfigurationPolicy{
 }
 
 Function Create-TunnelAgent{
-    dotnet run mstunnel.dll Agent $TenantAdmin $TenantPassword $Site.Id
+    dotnet run mstunnel.dll Agent $Site.Id $TenantAdmin $TenantPassword
 }
 
 Function Create-Flow {
