@@ -3,7 +3,7 @@
 1. Clone this repo onto the VM that you want to run this code on.
 2. Switch to root (needed for some of these commands)
 3. Setup your environment variables (run `./envSetup.sh -h` for more information)
-4. Run `git submodule init` and `chmod +x envSetup.sh exportCert.sh`
+4. Run `chmod +x envSetup.sh exportCert.sh`
 5. Setup the environment with `./envSetup.sh` 
    1. You can use the `-i` flag to have it install the prereqs of docker and acme.sh, and disable systemd-resolved.
    2. You can use the `-p` flag to install and configure a squid proxy on port 3128
