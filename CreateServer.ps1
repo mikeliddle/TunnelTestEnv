@@ -366,6 +366,9 @@ Function New-IosAppProtectionPolicy{
                 }
             }
         }
+        if (-not ($targetedApps -is [array])) {
+            $targetedApps = @($targetedApps)
+        }
         $body = @{
             apps = $targetedApps
             appGroupType = "selectedPublicApps"
@@ -434,6 +437,9 @@ Function New-IosAppConfigurationPolicy{
                     bundleId = $_
                 }
             }
+        }
+        if (-not ($targetedApps -is [array])) {
+            $targetedApps = @($targetedApps)
         }
         $body = @{
             apps = $targetedApps
