@@ -191,8 +191,8 @@ Function Initialize-SetupScript {
         $Content = @"
         export intune_env=$Environment;
         git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
-        git submodule update --init
         cd TunnelTestEnv
+        git submodule update --init
         chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
         PUBLIC_IP=`$(curl ifconfig.me)
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
