@@ -80,9 +80,9 @@ Function Login {
     az login --only-show-errors | Out-Null
     
     Write-Header "Logging into graph..."
-    Write-Header "Select the account to manage the profiles."
 
-    if (-Not $TenantCredential) {
+    if (-Not $TenantCredential) {    
+        Write-Header "Select the account to manage the profiles."
         $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT"
     } else {
         $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
@@ -227,6 +227,14 @@ Function Invoke-SetupScript {
     ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo su -c './Setup.sh'"
 }
 
+Function Update-PrivateDNSAddress {
+    Write-Header "Updating server configuration private DNS..."
+    $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
+    $newServers = $ServerConfiguration.DnsServers + $DNSPrivateAddress
+    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+}
+
 Function New-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$VmName'" -Limit 1
@@ -267,6 +275,20 @@ Function Remove-TunnelSite {
         Remove-MgDeviceManagementMicrosoftTunnelSite -MicrosoftTunnelSiteId $Site.Id
     } else {
         Write-Host "Site '$VmName' does not exist."
+    }
+}
+
+Function Remove-TunnelServers {
+    Write-Header "Deleting Servers..."
+    $script:Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$VmName'" -Limit 1
+    if($Site){
+        $servers = Get-MgDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Site.Id
+        $servers | ForEach-Object {
+            Write-Host "Deleting '$($_.DisplayName)'..."
+            Invoke-MgGraphRequest -Method DELETE -Uri "https://graph.microsoft.com/beta/deviceManagement/microsoftTunnelSites/$($Site.Id)/microsoftTunnelServers/$($_.Id)"
+        }
+    } else {
+        Write-Host "No site found for '$VmName', so no servers will be deleted."
     }
 }
 
@@ -521,6 +543,8 @@ Function Create-Flow {
     Initialize-SetupScript
     Invoke-SetupScript
 
+    Update-PrivateDNSAddress
+    
     Update-ADApplication
 
     New-IosAppProtectionPolicy
@@ -537,6 +561,7 @@ Function Delete-Flow {
 
     Remove-IosAppConfigurationPolicy
     Remove-IosAppProtectionPolicy
+    Remove-TunnelServers
     Remove-TunnelSite
     Remove-TunnelConfiguration
     Logout
