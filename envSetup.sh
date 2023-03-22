@@ -98,9 +98,6 @@ Uninstall() {
     $ctr_cli volume rm nginx-vol
     $ctr_cli volume rm unbound
 
-    LogInfo "removing /etc/pki/tls folder"
-    rm -rf /etc/pki/tls
-
     LogInfo "uninstalling tunnel"
     mst-cli uninstall
 
@@ -261,7 +258,7 @@ ConfigureNginx() {
 	# run the containers on the $ctr_cli subnet
 	$ctr_cli run -d \
 		--name=nginx \
-		--mount source=nginx-vol,destination=/etc/volume \
+		--mount type=volume,source=nginx-vol,destination=/etc/volume \
 		--restart=unless-stopped \
 		-v $(pwd)/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
         -v /etc/pki/tls/certs:/etc/volume/certs:ro \
