@@ -48,6 +48,7 @@ $script:App = $null
 $script:Group = $null
 $script:AppProtectionPolicy = $null
 $script:AppConfigurationPolicy = $null
+$script:Platform = ""
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -64,6 +65,14 @@ Function Test-Prerequisites {
         Write-Header "Installing Microsoft.Graph..."
         Install-Module Microsoft.Graph -Force
     }
+
+    if ($IsLinux) {
+        $script:Platform = "linux"
+    } elseif ($IsMacOS) {
+        $script:Platform = "osx"
+    } else {
+        $script:Platform = "win"
+    }
 }
 
 Function Login {
@@ -72,14 +81,18 @@ Function Login {
     
     Write-Header "Logging into graph..."
     Write-Header "Select the account to manage the profiles."
+
     if (-Not $TenantCredential) {
-        $TenantCredential = Get-Credential
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT"
+    } else {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
     }
-    $script:JWT = dotnet mstunnel.dll JWT $TenantCredential.UserName $TenantCredential.GetNetworkCredential().Password
+    
     if (-Not $JWT) {
         Write-Error "Could not get JWT for account"
         Exit -1
     }
+
     Connect-MgGraph -AccessToken $script:JWT | Out-Null
     
     # Switch to beta since most of our endpoints are there
@@ -179,7 +192,7 @@ Function Initialize-SetupScript {
         export intune_env=$Environment;
         git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
         cd TunnelTestEnv
-        chmod +x setup.sh setup.exp envSetup.sh exportCert.sh 
+        chmod +x setup.sh setup.exp envSetup.sh exportCert.sh setup-expect.sh
         PUBLIC_IP=`$(curl ifconfig.me)
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
@@ -463,7 +476,11 @@ Function Remove-IosAppConfigurationPolicy{
 }
 
 Function New-TunnelAgent{
-    dotnet mstunnel.dll Agent $Site.Id $TenantCredential.UserName $TenantCredential.GetNetworkCredential().Password
+    if (-Not $TenantCredential) {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe Agent $($Site.Id)"
+    } else {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+    }
 }
 
 Function Create-Flow {
@@ -475,10 +492,10 @@ Function Create-Flow {
     New-NetworkRules
     Move-SSHKeys
 
-    New-TunnelAgent
-
     New-TunnelConfiguration
     New-TunnelSite
+
+    New-TunnelAgent
 
     Initialize-SetupScript
     Invoke-SetupScript
