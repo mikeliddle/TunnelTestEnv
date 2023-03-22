@@ -1,37 +1,43 @@
-[cmdletbinding()]
+[cmdletbinding(DefaultParameterSetName="Create")]
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
+    [string]$VmName,
+    [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [string[]]$BundleIds,
+    [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [string]$GroupName,
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [ValidateSet("PE","SelfHost","OneDF")]
     [string]$Environment="PE",
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Email="",
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Username="azureuser",
-    [Parameter(Mandatory=$true)]
-    [string]$VmName,
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Size = "Standard_B1s",
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"Canonical:UbuntuServer:18.04-LTS:18.04.202106220"
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$ADApplication = "Generated MAM Tunnel",
-    [Parameter(Mandatory=$true)]
-    [string[]]$BundleIds,
-    [Parameter(Mandatory=$true)]
-    [string]$GroupName,
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [switch]$NoProxy,
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [switch]$UseEnterpriseCa,
-    [Parameter(Mandatory=$false)]
-    [switch]$TenantAdmin="",
-    [Parameter(Mandatory=$false)]
-    [switch]$TenantPassword="",
-    [Parameter(Mandatory=$false)]
-    [switch]$Delete
+    [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
+    [string]$TenantAdmin,
+    [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
+    [string]$TenantPassword,
+    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
+    [switch]$Delete,
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [switch]$StayLoggedIn
 )
 
 $script:Account = $null
@@ -50,7 +56,8 @@ Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
 }
 
-Function Check-Prerequisites {
+Function Test-Prerequisites {
+    Write-Header "Checking prerequisites..."
     if (-Not ([bool](Get-Command -ErrorAction Ignore az))) {
         Write-Error "Please install azure cli`nhttps://learn.microsoft.com/en-us/cli/azure/"
         Exit 1
@@ -68,7 +75,7 @@ Function Login {
     
     Write-Header "Logging into graph..."
     Write-Header "Select the account to manage the profiles."
-    $script:JWT = dotnet run mstunnel.dll JWT $TenantAdmin $TenantPassword
+    $script:JWT = dotnet mstunnel.dll JWT $TenantAdmin $TenantPassword
     Connect-MgGraph -AccessToken $script:JWT | Out-Null
     
     # Switch to beta since most of our endpoints are there
@@ -76,29 +83,36 @@ Function Login {
 }
 
 Function Logout {
-    az logout
-    $script:Account = Disconnect-MgGraph
+    if (-Not $StayLoggedIn) {
+        Write-Header "Logging out..."
+        az logout
+        $script:Account = Disconnect-MgGraph
+    }
 }
 
-Function Detect-Variables {
+Function Initialize-Variables {
     $script:Account = (az account show | ConvertFrom-Json)
     $script:Subscription = $Account.id
     if ($Email -eq "") {
-        Write-Host "Email not provided. Detecting email..."
+        Write-Header "Email not provided. Detecting email..."
         $script:Email = $Account.user.name
         Write-Host "Detected your email as '$Email'"
     }
 
     $script:ResourceGroup = "$VmName-group"
     $script:SSHKeyPath = "~/.ssh/$VmName"
-    $script:Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
-    if (-Not $Group) {
-        Write-Error "Could not find group named '$GroupName'"
-        Exit 1
+
+    if (-Not $Delete) {
+        # We only need a group name for the create flow
+        $script:Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
+        if (-Not $Group) {
+            Write-Error "Could not find group named '$GroupName'"
+            Exit -1
+        }
     }
 }
 
-Function Create-ResourceGroup {
+Function New-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
     if ([bool](az group show --name $resourceGroup --subscription $Subscription 2> $null)) {
         Write-Error "Group '$resourceGroup' already exists"
@@ -109,7 +123,7 @@ Function Create-ResourceGroup {
     $groupData = az group create --subscription $subscription --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
 }
 
-Function Delete-ResourceGroup {
+Function Remove-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
     if ([bool](az group show --name $resourceGroup --subscription $Subscription 2> $null)) {
         Write-Header "Deleting resource group '$resourceGroup'..."
@@ -119,14 +133,14 @@ Function Delete-ResourceGroup {
     }
 }
 
-Function Create-VM {
+Function New-VM {
     Write-Header "Creating VM '$VmName'..."
     $vmdata = az vm create --subscription $subscription --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --generate-ssh-keys --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
     $script:FQDN = $vmdata.fqdns
     Write-Host "DNS is '$FQDN'"
 }
 
-Function Create-NetworkRules {
+Function New-NetworkRules {
     Write-Header "Creating network rules..."
     az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
     az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 80 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
@@ -138,7 +152,7 @@ Function Move-SSHKeys{
     Move-Item -Path ~/.ssh/id_rsa.pub -Destination ~/.ssh/$VmName.pub -Force    
 }
 
-Function Delete-SSHKeys{
+Function Remove-SSHKeys{
     Write-Header "Deleting SSH keys..."
     if (Test-Path $sshKeyPath) {
         Remove-Item -Path $sshKeyPath -Force
@@ -153,7 +167,7 @@ Function Delete-SSHKeys{
     }
 }
 
-Function Stage-SetupScript {
+Function Initialize-SetupScript {
     try{
         Write-Header "Generating setup script..."
         $ServerName = $FQDN.Split('.')[0]
@@ -182,12 +196,12 @@ Function Stage-SetupScript {
     }
 }
 
-Function Run-SetupScript {
+Function Invoke-SetupScript {
     Write-Header "Connecting into remote server..."
     ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo ./Setup.sh"
 }
 
-Function Create-TunnelConfiguration {
+Function New-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$VmName'" -Limit 1
     if ($ServerConfiguration) {
@@ -200,7 +214,7 @@ Function Create-TunnelConfiguration {
     }
 }
 
-Function Delete-TunnelConfiguration {
+Function Remove-TunnelConfiguration {
     Write-Header "Deleting Server Configuration..."
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$VmName'" -Limit 1
     if($ServerConfiguration) {
@@ -210,7 +224,7 @@ Function Delete-TunnelConfiguration {
     }
 }
 
-Function Create-TunnelSite {
+Function New-TunnelSite {
     Write-Header "Creating Site..."
     $script:Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$VmName'" -Limit 1
     if ($Site) {
@@ -220,7 +234,7 @@ Function Create-TunnelSite {
     }
 }
 
-Function Delete-TunnelSite {
+Function Remove-TunnelSite {
     Write-Header "Deleting Site..."
     $script:Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$VmName'" -Limit 1
     if($Site) {
@@ -230,7 +244,7 @@ Function Delete-TunnelSite {
     }
 }
 
-Function CreateOrUpdate-ADApplication {
+Function Update-ADApplication {
     $script:App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
     if($App) {
         if ($BundleIds -and $BundleIds.Count -gt 0){
@@ -318,7 +332,7 @@ Function CreateOrUpdate-ADApplication {
     }
 }
 
-Function Create-IosAppProtectionPolicy{
+Function New-IosAppProtectionPolicy{
     $DisplayName = "$VmName-Protection"
     $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($AppProtectionPolicy) {
@@ -360,7 +374,7 @@ Function Create-IosAppProtectionPolicy{
     }
 }
 
-Function Delete-IosAppProtectionPolicy{
+Function Remove-IosAppProtectionPolicy{
     $DisplayName = "$VmName-Protection"
     Write-Header "Deleting App Protection Policy '$DisplayName'..."
     $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
@@ -371,7 +385,7 @@ Function Delete-IosAppProtectionPolicy{
     }
 }
 
-Function Create-IosAppConfigurationPolicy{
+Function New-IosAppConfigurationPolicy{
     $DisplayName = "$VmName-Configuration"
     $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($script:AppConfigurationPolicy) {
@@ -433,7 +447,7 @@ Function Create-IosAppConfigurationPolicy{
     }
 }
 
-Function Delete-IosAppConfigurationPolicy{
+Function Remove-IosAppConfigurationPolicy{
     $DisplayName = "$VmName-Configuration"
     Write-Header "Deleting App Configuration Policy '$DisplayName'..."
     $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
@@ -444,45 +458,45 @@ Function Delete-IosAppConfigurationPolicy{
     }
 }
 
-Function Create-TunnelAgent{
-    dotnet run mstunnel.dll Agent $Site.Id $TenantAdmin $TenantPassword
+Function New-TunnelAgent{
+    dotnet mstunnel.dll Agent $Site.Id $TenantAdmin $TenantPassword
 }
 
 Function Create-Flow {
-    Check-Prerequisites
+    Test-Prerequisites
     Login
-    Detect-Variables
-    Create-ResourceGroup
-    Create-VM
-    Create-NetworkRules
+    Initialize-Variables
+    New-ResourceGroup
+    New-VM
+    New-NetworkRules
     Move-SSHKeys
 
-    Create-TunnelAgent
+    New-TunnelAgent
 
-    Create-TunnelConfiguration
-    Create-TunnelSite
+    New-TunnelConfiguration
+    New-TunnelSite
 
-    Stage-SetupScript
-    Run-SetupScript
+    Initialize-SetupScript
+    Invoke-SetupScript
 
-    CreateOrUpdate-ADApplication
+    Update-ADApplication
 
-    Create-IosAppProtectionPolicy
-    Create-IosAppConfigurationPolicy
+    New-IosAppProtectionPolicy
+    New-IosAppConfigurationPolicy
     Logout
 }
 
 Function Delete-Flow {
-    Check-Prerequisites
+    Test-Prerequisites
     Login
-    Detect-Variables
-    Delete-ResourceGroup
-    Delete-SSHKeys
+    Initialize-Variables
+    Remove-ResourceGroup
+    Remove-SSHKeys
 
-    Delete-IosAppConfigurationPolicy
-    Delete-IosAppProtectionPolicy
-    Delete-TunnelSite
-    Delete-TunnelConfiguration
+    Remove-IosAppConfigurationPolicy
+    Remove-IosAppProtectionPolicy
+    Remove-TunnelSite
+    Remove-TunnelConfiguration
     Logout
 }
 
