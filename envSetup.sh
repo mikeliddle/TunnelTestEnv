@@ -134,7 +134,7 @@ VerifyEnvironmentVars() {
         LogWarning "MISSING PROXY BYPASS NAMES, all urls will have to go through the proxy."
     fi
     if [ $fail ]; then
-        exit
+        exit 1
     fi
 }
 
@@ -164,6 +164,11 @@ ConfigureCerts() {
     mkdir -p /etc/pki/tls/req
     mkdir -p /etc/pki/tls/private
     
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup pki directory structure"
+        exit 1
+    fi
+    
     # copy config into the tls folder structure
     cp openssl.conf.d/* /etc/pki/tls
 
@@ -174,15 +179,30 @@ ConfigureCerts() {
     openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
         -out certs/cacert.pem >> certs.log 2>&1
 
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup CA cert"
+        exit 1
+    fi
+
     # generate leaf from our CA
     openssl genrsa -out private/server.key 4096 >> certs.log 2>&1
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
 
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup Leaf cert"
+        exit 1
+    fi
+
     # generate untrusted leaf cert
     openssl req -new -newkey rsa:4096 -x509 -sha256 -days 365 -config untrusted.conf -nodes -out \
         certs/untrusted.pem -keyout private/untrusted.key >> certs.log 2>&1
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup Self-Signed cert"
+        exit 1
+    fi
 
     if [[ !$SKIP_LETS_ENCRYPT ]]; then
 		/root/.acme.sh/acme.sh --upgrade  >> certs.log 2>&1
@@ -195,6 +215,11 @@ ConfigureCerts() {
 
 		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem  >> certs.log 2>&1
 		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key  >> certs.log 2>&1
+
+        if [ $? -ne 0 ]; then
+            LogError "Failed to setup LetsEncrypt cert"
+            exit 1
+        fi
     fi
 
     cd $current_dir
@@ -221,6 +246,12 @@ ConfigureUnbound() {
     docker restart unbound >> unbound.log 2>&1
 
     UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+
+    UNBOUND_HEALTH=$(docker container inspect -f "{{ .State.Status }}" unbound)
+    if [ "$UNBOUND_HEALTH" != "running" ]; then
+        LogError "Failed to setup DNS server container"
+        exit 1
+    fi
 }
 
 ConfigureNginx() {
@@ -248,6 +279,12 @@ ConfigureNginx() {
     cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
 
     docker restart nginx >> nginx.log 2>&1
+
+    NGINX_HEALTH=$(docker container inspect -f "{{ .State.Status }}" nginx)
+    if [ "$NGINX_HEALTH" != "running" ]; then
+        LogError "Failed to setup web server container"
+        exit 1
+    fi
 }
 
 ###########################################################################################
@@ -290,6 +327,12 @@ BuildAndRunProxy() {
 
     docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
     docker restart proxy >> proxy.log 2>&1
+
+    PROXY_HEALTH=$(docker container inspect -f "{{ .State.Status }}" proxy)
+    if [ "$PROXY_HEALTH" != "running" ]; then
+        LogError "Failed to setup proxy container"
+        exit 1
+    fi
 }
 
 PrintConf() {
@@ -337,6 +380,12 @@ BuildAndRunWebService() {
 
     WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
+
+    WEBSERVICE_HEALTH=$(docker container inspect -f "{{ .State.Status }}" webService)
+    if [ "$WEBSERVICE_HEALTH" != "running" ]; then
+        LogError "Failed to setup .NET server container"
+        exit 1
+    fi
 }
 
 ###########################################################################################
@@ -348,6 +397,11 @@ InstallTunnelAppliance() {
     # Install
     LogInfo "Installing Tunnel"
     mst_no_prompt=1 ./mstunnel-setup
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to install Tunnel"
+        exit 1
+    fi
 }
 
 SetupTunnelPrereqs() {
@@ -359,7 +413,8 @@ SetupTunnelPrereqs() {
     # Touch EULA
     touch /etc/mstunnel/EulaAccepted
 
-    cp agent-info.json /etc/mstunnel/agent-info.json
+    # recoverable, you'll need to interact though.
+    cp agent-info.json /etc/mstunnel/agent-info.json > /dev/null 2>&1
 }
 
 ###########################################################################################
@@ -371,20 +426,37 @@ SetupEnterpriseCerts() {
     # put the certs in place
     # no need using a different server cert, just need to reformat it.
     cp /etc/pki/tls/certs/server.pem /etc/pki/tls/certs/tunnel.pem
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup leaf cert"
+        exit 1
+    fi
+
     cat /etc/pki/tls/certs/cacert.pem >> /etc/pki/tls/certs/tunnel.pem
 
     cp /etc/pki/tls/certs/tunnel.pem /etc/mstunnel/certs/site.crt    
     cp /etc/pki/tls/private/server.key /etc/mstunnel/private/site.key
 
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup certs"
+        exit 1
+    fi
+
     LogWarning "Make sure this root certificate is uploaded to Intune and targeted properly"
-    cat /etc/pki/tls/certs/cacert.pem
 }
 
 SetupTunnelCerts() {
     # put the certs in place
     cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
     cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
-    cp agent.p12 /etc/mstunnel/private/agent.p12
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup LetsEncrypt certs"
+        exit 1
+    fi
+
+    # recoverable by tunnel, don't bail here.
+    cp agent.p12 /etc/mstunnel/private/agent.p12 > /dev/null 2>&1
 }
 
 ###########################################################################################
