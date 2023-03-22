@@ -1,2 +1,4 @@
 .DS_Store
 *.log
+agent.p12
+agent-info.json
