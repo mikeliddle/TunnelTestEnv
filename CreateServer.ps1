@@ -27,12 +27,9 @@ param(
     [switch]$NoProxy,
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [switch]$UseEnterpriseCa,
-    [Parameter(Mandatory=$true, ParameterSetName="Create")]
-    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
-    [string]$TenantAdmin,
-    [Parameter(Mandatory=$true, ParameterSetName="Create")]
-    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
-    [string]$TenantPassword,
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [pscredential]$TenantCredential,
     [Parameter(Mandatory=$true, ParameterSetName="Delete")]
     [switch]$Delete,
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -75,7 +72,14 @@ Function Login {
     
     Write-Header "Logging into graph..."
     Write-Header "Select the account to manage the profiles."
-    $script:JWT = dotnet mstunnel.dll JWT $TenantAdmin $TenantPassword
+    if (-Not $TenantCredential) {
+        $TenantCredential = Get-Credential
+    }
+    $script:JWT = dotnet mstunnel.dll JWT $TenantCredential.UserName $TenantCredential.GetNetworkCredential().Password
+    if (-Not $JWT) {
+        Write-Error "Could not get JWT for account"
+        Exit -1
+    }
     Connect-MgGraph -AccessToken $script:JWT | Out-Null
     
     # Switch to beta since most of our endpoints are there
@@ -459,7 +463,7 @@ Function Remove-IosAppConfigurationPolicy{
 }
 
 Function New-TunnelAgent{
-    dotnet mstunnel.dll Agent $Site.Id $TenantAdmin $TenantPassword
+    dotnet mstunnel.dll Agent $Site.Id $TenantCredential.UserName $TenantCredential.GetNetworkCredential().Password
 }
 
 Function Create-Flow {
