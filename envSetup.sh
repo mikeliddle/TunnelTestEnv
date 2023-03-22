@@ -19,6 +19,12 @@ InstallPrereqs() {
     apt install -y docker.io >> install.log 2>&1
     apt install -y jq >> install.log 2>&1
 
+    docker --version > /dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        LogError "Missing Docker... aborting"
+        exit 1
+    fi
+
     LogInfo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
@@ -27,9 +33,13 @@ InstallPrereqs() {
 
     LogInfo "pulling mst-readiness and mstunnel-setup"
     wget -q aka.ms/mst-readiness 
+    [ $? -ne 0 ] && exit
     chmod +x mst-readiness
+
     wget -q --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
+    [ $? -ne 0 ] && exit
     chmod +x ./mstunnel-setup
+
 
     LogInfo "setting up acme.sh"
     git submodule update --init
@@ -37,6 +47,11 @@ InstallPrereqs() {
     
 	./acme.sh --install -m $EMAIL >> install.log
 	
+    if [ $? -ne 0 ]; then
+        LogError "acme.sh not properly setup... aborting"
+        exit 1
+    fi
+
 	cd ..
 }
 
