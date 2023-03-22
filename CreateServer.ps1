@@ -160,7 +160,7 @@ Function New-VM {
 Function New-NetworkRules {
     Write-Header "Creating network rules..."
     az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 80 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
+    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
 Function Move-SSHKeys{
@@ -192,12 +192,20 @@ Function Initialize-SetupScript {
         export intune_env=$Environment;
         git clone --single-branch --branch Hackathon https://github.com/mikeliddle/TunnelTestEnv.git
         cd TunnelTestEnv
+
+        cp ../agent.p12 .
+        cp ../agent-info.json .
+
         git submodule update --init
+
         chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
+        
         PUBLIC_IP=`$(curl ifconfig.me)
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
+        
         ./setup-expect.sh
+        
         expect -f ./setup.exp
 "@
         Set-Content -Path "./Setup.sh" -Value $Content -Force
@@ -216,7 +224,7 @@ Function Initialize-SetupScript {
 
 Function Invoke-SetupScript {
     Write-Header "Connecting into remote server..."
-    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo ./Setup.sh"
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo su -c './Setup.sh'"
 }
 
 Function New-TunnelConfiguration {
