@@ -354,6 +354,9 @@ Function Remove-TunnelServers {
 Function Update-ADApplication {
     $script:App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
     if($App) {
+        Write-Success "Client Id: $($App.AppId)"
+        Write-Success "Tenant Id: $($App.PublisherDomain)"
+        
         if ($BundleIds -and $BundleIds.Count -gt 0){
             Write-Header "Found AD Application '$ADApplication'..."
             $uris = [System.Collections.ArrayList]@()
