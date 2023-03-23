@@ -1,5 +1,14 @@
 # How To run
 
+## Automate everything
+
+1. Clone this repo to your local machine.
+2. Ensure powershell is installed on your machine.
+3. Run `./CreateServer.ps1` with the necessary parameters.
+4. Clean up the environment by running `./CreateServer.ps1 -Delete`
+
+## Automate just the Environment
+
 1. Clone this repo onto the VM that you want to run this code on.
 2. Switch to root (needed for some of these commands)
 3. Setup your environment variables (run `./envSetup.sh -h` for more information)
@@ -16,7 +25,3 @@
 3. Unbound - A DNS resolver that will allow requests coming into our server to use the local IP address instead of the public IP address for the specified domain name. This uses port 53 on UDP and TCP.
 4. letsEncrypt - An NGINX server with a publicly trusted TLS certificate.
 5. webService - A docker container serving up a sample web project using the above internally-trusted CA
-
-# Known limitations
-
-* This does not configure the firewall on the VM, so you may have additional work to allow the ports used by this environment
