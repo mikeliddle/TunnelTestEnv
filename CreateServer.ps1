@@ -5,9 +5,9 @@ param(
     [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
     [string]$VmName,
 
-    [Parameter(Mandatory=$true, ParameterSetName="Create")]
-    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
-    [string[]]$BundleIds,
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [string[]]$BundleIds=@(),
 
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
     [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
@@ -356,7 +356,7 @@ Function Update-ADApplication {
     if($App) {
         Write-Success "Client Id: $($App.AppId)"
         Write-Success "Tenant Id: $($App.PublisherDomain)"
-        
+
         if ($BundleIds -and $BundleIds.Count -gt 0){
             Write-Header "Found AD Application '$ADApplication'..."
             $uris = [System.Collections.ArrayList]@()
