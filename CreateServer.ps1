@@ -59,7 +59,10 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [switch]$StayLoggedIn
+    [switch]$StayLoggedIn,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [switch]$WithSSHOpen
 )
 
 $script:Account = $null
@@ -78,6 +81,10 @@ $script:Platform = ""
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
+}
+
+Function Write-Success([string]$Message) {
+    Write-Host $Message -ForegroundColor Green
 }
 
 Function Test-Prerequisites {
@@ -187,7 +194,12 @@ Function New-VM {
 
 Function New-NetworkRules {
     Write-Header "Creating network rules..."
-    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
+    
+    if ($WithSSHOpen)
+    {
+        az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
+    }
+    
     az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
@@ -420,6 +432,9 @@ Function Update-ADApplication {
         }
         
         $script:App = New-MgApplication -DisplayName $ADApplication -RequiredResourceAccess $RequiredResourceAccess -OptionalClaims $OptionalClaims -PublicClient $PublicClient -SignInAudience "AzureADMyOrg"
+
+        Write-Success "Client Id: $($App.AppId)"
+        Write-Success "Tenant Id: $($App.PublisherDomain)"
 
         Write-Header "You will need to grant consent. Opening browser in 15 seconds..."
         Start-Sleep -Seconds 15
