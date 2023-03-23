@@ -228,15 +228,15 @@ Function Initialize-SetupScript {
             installer="dnf"
         fi
 
-        `$installer install -y git
+        `$installer install -y git >> install.log 2>&1
 
-        git clone --single-branch --branch $GitBranch https://github.com/mikeliddle/TunnelTestEnv.git
+        git clone --single-branch --branch $GitBranch https://github.com/mikeliddle/TunnelTestEnv.git >> install.log 2>&1
         cd TunnelTestEnv
 
         cp ../agent.p12 .
         cp ../agent-info.json .
 
-        git submodule update --init
+        git submodule update --init >> install.log 2>&1
 
         chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
         
@@ -270,7 +270,7 @@ Function Invoke-SetupScript {
 Function Update-PrivateDNSAddress {
     Write-Header "Updating server configuration private DNS..."
     $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
-    $newServers = $ServerConfiguration.DnsServers + $DNSPrivateAddress
+    $newServers = $DNSPrivateAddress
     Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
 }
