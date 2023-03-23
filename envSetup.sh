@@ -237,7 +237,7 @@ ConfigureUnbound() {
         docker.io/mvance/unbound:latest >> unbound.log 2>&1
 
     # copy in necessary config files
-    $ctr_cli cp unbound.conf.d/a-records.conf unbound:a-records.conf
+    $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     # restart to apply config change
     $ctr_cli restart unbound >> unbound.log 2>&1
 
