@@ -257,17 +257,18 @@ ConfigureNginx() {
 
 	# run the containers on the $ctr_cli subnet
 	$ctr_cli run -d \
+        --mount type=volume,source=nginx-vol,dst=/etc/volume \
 		--name=nginx \
-		--mount type=volume,source=nginx-vol,destination=/etc/volume \
 		--restart=unless-stopped \
-		-v $(pwd)/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
-        -v /etc/pki/tls/certs:/etc/volume/certs:ro \
-        -v /etc/pki/tls/private:/etc/volume/private:ro \
-        -v $(pwd)/nginx_data:/etc/volume/data:ro \
 		docker.io/library/nginx >> nginx.log 2>&1
 
     NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
+
+    $ctr_cli cp nginx.conf.d/nginx.conf nginx:/etc/nginx/nginx.conf
+    $ctr_cli cp nginx_data/ nginx:/etc/volume/
+    $ctr_cli cp /etc/pki/tls/certs/ nginx:/etc/volume/
+    $ctr_cli cp /etc/pki/tls/private/ nginx:/etc/volume/
 
     $ctr_cli restart nginx >> nginx.log 2>&1
 
