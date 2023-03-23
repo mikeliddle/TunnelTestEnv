@@ -314,7 +314,7 @@ BuildAndRunProxy() {
     sed -i "s/PROXY_URL/proxy.${DOMAIN_NAME}/g" nginx_data/tunnel.pac
     
     # $ctr_cli copy into nginx container
-    $ctr_cli cp nginx_data/tunnel.pac nginx:/etc/volume/data/tunnel.pac
+    $ctr_cli cp nginx_data/tunnel.pac nginx:/etc/volume/nginx_data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
