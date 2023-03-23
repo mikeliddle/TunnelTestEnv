@@ -13,15 +13,14 @@ LogWarning() {
 }
 
 InstallPrereqs() {
-    LogInfo "installing Docker"
-    apt update > install.log 2>&1
-    apt remove -y docker >>  install.log 2>&1
-    apt install -y docker.io >> install.log 2>&1
-    apt install -y jq >> install.log 2>&1
+    LogInfo "installing container runtime"
+    $update_command >> install.log 2>&1
+    $installer install -y $ctr_package_name >> install.log 2>&1
+    $installer install -y jq >> install.log 2>&1
 
-    docker --version > /dev/null 2>&1
+    $ctr_cli --version > /dev/null 2>&1
     if [ $? -ne 0 ]; then
-        LogError "Missing Docker... aborting"
+        LogError "Missing container runtime... aborting"
         exit 1
     fi
 
@@ -82,25 +81,22 @@ Help() {
 }
 
 Uninstall() {
-    LogInfo "removing docker containers"
-	docker stop nginx
-	docker rm nginx
+    LogInfo "removing $ctr_cli containers"
+	$ctr_cli stop nginx
+	$ctr_cli rm nginx
 
-    docker stop unbound
-    docker rm unbound
+    $ctr_cli stop unbound
+    $ctr_cli rm unbound
 
-    docker stop webService
-    docker rm webService
+    $ctr_cli stop webService
+    $ctr_cli rm webService
 
-    docker stop proxy
-    docker rm proxy
+    $ctr_cli stop proxy
+    $ctr_cli rm proxy
 
-    LogInfo "removing docker volumes"
-    docker volume rm nginx-vol
-    docker volume rm unbound
-
-    LogInfo "removing /etc/pki/tls folder"
-    rm -rf /etc/pki/tls
+    LogInfo "removing $ctr_cli volumes"
+    $ctr_cli volume rm nginx-vol
+    $ctr_cli volume rm unbound
 
     LogInfo "uninstalling tunnel"
     mst-cli uninstall
@@ -149,7 +145,7 @@ ReplaceNames() {
 
 ###########################################################################################
 #                                                                                         #
-#                           Simple Env Setup with Docker                                  #
+#                           Simple Env Setup with $ctr_cli                                  #
 #                                                                                         #
 ###########################################################################################
 
@@ -175,7 +171,7 @@ ConfigureCerts() {
     cd /etc/pki/tls
 
     # generate self-signed root CA
-    openssl genrsa -out private/cakey.pem 4096 > certs.log 2>&1
+    openssl genrsa -out private/cakey.pem 4096 >> certs.log 2>&1
     openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
         -out certs/cacert.pem >> certs.log 2>&1
 
@@ -229,25 +225,25 @@ ConfigureCerts() {
 ConfigureUnbound() {
     LogInfo "Setting up private DNS server"
     # create the unbound volume
-    docker volume create unbound > unbound.log
+    $ctr_cli volume create unbound > unbound.log
 
     # run the unbound container
-    docker run -d \
+    $ctr_cli run -d \
         --name=unbound \
         -v unbound:/opt/unbound/etc/unbound/ \
         -p 53:53/tcp \
         -p 53:53/udp \
         --restart=unless-stopped \
-        mvance/unbound:latest >> unbound.log 2>&1
+        docker.io/mvance/unbound:latest >> unbound.log 2>&1
 
     # copy in necessary config files
-    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
+    $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     # restart to apply config change
-    docker restart unbound >> unbound.log 2>&1
+    $ctr_cli restart unbound >> unbound.log 2>&1
 
-    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
 
-    UNBOUND_HEALTH=$(docker container inspect -f "{{ .State.Status }}" unbound)
+    UNBOUND_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" unbound)
     if [ "$UNBOUND_HEALTH" != "running" ]; then
         LogError "Failed to setup DNS server container"
         exit 1
@@ -257,30 +253,26 @@ ConfigureUnbound() {
 ConfigureNginx() {
     LogInfo "Setting up private web server container"
     # create volume
-    docker volume create nginx-vol > nginx.log
+    $ctr_cli volume create nginx-vol > nginx.log
 
-    # copy config files, certs, and pages to serve up
-    cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
-    cp -r /etc/pki/tls/certs /var/lib/docker/volumes/nginx-vol/_data/certs
-    cp -r /etc/pki/tls/private /var/lib/docker/volumes/nginx-vol/_data/private
-    cp -r nginx_data /var/lib/docker/volumes/nginx-vol/_data/data
-
-	# run the containers on the docker subnet
-	docker run -d \
+	# run the containers on the $ctr_cli subnet
+	$ctr_cli run -d \
+        --mount type=volume,source=nginx-vol,dst=/etc/volume \
 		--name=nginx \
-		--mount source=nginx-vol,destination=/etc/volume \
 		--restart=unless-stopped \
-		-v /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d/nginx.conf:/etc/nginx/nginx.conf:ro \
-		nginx >> nginx.log 2>&1
+		docker.io/library/nginx >> nginx.log 2>&1
 
-    NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
     sed -i "s/##NGINX_IP##/${NGINX_IP}/g" *.d/*.conf
 
-    cp -r nginx.conf.d /var/lib/docker/volumes/nginx-vol/_data/nginx.conf.d
+    $ctr_cli cp nginx.conf.d/nginx.conf nginx:/etc/nginx/nginx.conf
+    $ctr_cli cp nginx_data/ nginx:/etc/volume/
+    $ctr_cli cp /etc/pki/tls/certs/ nginx:/etc/volume/
+    $ctr_cli cp /etc/pki/tls/private/ nginx:/etc/volume/
 
-    docker restart nginx >> nginx.log 2>&1
+    $ctr_cli restart nginx >> nginx.log 2>&1
 
-    NGINX_HEALTH=$(docker container inspect -f "{{ .State.Status }}" nginx)
+    NGINX_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" nginx)
     if [ "$NGINX_HEALTH" != "running" ]; then
         LogError "Failed to setup web server container"
         exit 1
@@ -297,7 +289,7 @@ BuildAndRunProxy() {
     LogInfo "Setting up squid proxy container"
 
     PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
-    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
     sed -i -e "s/\bPROXY_PORT\b/3128/g" nginx_data/tunnel.pac
@@ -308,8 +300,8 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    docker build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile > proxy.log
-    docker run -d \
+    $ctr_cli build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile > proxy.log
+    $ctr_cli run -d \
             --name proxy \
             --restart always \
             --volume /etc/squid \
@@ -317,18 +309,20 @@ BuildAndRunProxy() {
             --dns-search "$DOMAIN_NAME" \
             ubuntu:squid >> proxy.log 2>&1
 
-    PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+    PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
     sed -i "s/PROXY_URL/proxy.${DOMAIN_NAME}/g" nginx_data/tunnel.pac
-    cp nginx_data/tunnel.pac /var/lib/docker/volumes/nginx-vol/_data/data/tunnel.pac
+    
+    # $ctr_cli copy into nginx container
+    $ctr_cli cp nginx_data/tunnel.pac nginx:/etc/volume/nginx_data/tunnel.pac
     sed -i "s/# local-data/local-data/g" unbound.conf.d/a-records.conf
-    cp unbound.conf.d/a-records.conf /var/lib/docker/volumes/unbound/_data/a-records.conf
-    docker restart unbound >> proxy.log 2>&1
+    $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
+    $ctr_cli restart unbound >> proxy.log 2>&1
 
-    docker cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
-    docker restart proxy >> proxy.log 2>&1
+    $ctr_cli cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
+    $ctr_cli restart proxy >> proxy.log 2>&1
 
-    PROXY_HEALTH=$(docker container inspect -f "{{ .State.Status }}" proxy)
+    PROXY_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" proxy)
     if [ "$PROXY_HEALTH" != "running" ]; then
         LogError "Failed to setup proxy container"
         exit 1
@@ -368,9 +362,9 @@ BuildAndRunWebService() {
 
     cd sampleWebService
 
-    docker build -t samplewebservice . > webService.log
+    $ctr_cli build -t samplewebservice . > webService.log
 
-    docker run -d \
+    $ctr_cli run -d \
         --name=webService \
         --restart=unless-stopped \
         -p 80:80 \
@@ -378,10 +372,10 @@ BuildAndRunWebService() {
 
     cd $current_dir
 
-    WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 
-    WEBSERVICE_HEALTH=$(docker container inspect -f "{{ .State.Status }}" webService)
+    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webService)
     if [ "$WEBSERVICE_HEALTH" != "running" ]; then
         LogError "Failed to setup .NET server container"
         exit 1
@@ -448,6 +442,11 @@ SetupEnterpriseCerts() {
 SetupTunnelCerts() {
     # put the certs in place
     cp /etc/pki/tls/certs/letsencrypt.pem /etc/mstunnel/certs/site.crt
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup LetsEncrypt certs"
+        exit 1
+    fi
+
     cp /etc/pki/tls/private/letsencrypt.key /etc/mstunnel/private/site.key
     
     if [ $? -ne 0 ]; then
@@ -466,62 +465,87 @@ SetupTunnelCerts() {
 ###########################################################################################
 Update(){
     # capture initial state
-    NGINX_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
-    WEBAPP_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
-    PROXY_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
-    UNBOUND_INITIAL_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    NGINX_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
+    WEBAPP_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
+    PROXY_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
+    UNBOUND_INITIAL_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
     UNBOUND_IP="$UNBOUND_INITIAL_IP"
     
     # start with nginx
-    docker stop nginx
-    docker rm nginx
-    docker volume rm nginx-vol
+    $ctr_cli stop nginx
+    $ctr_cli rm nginx
+    $ctr_cli volume rm nginx-vol
 
-    WEBSERVICE_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
     
     ConfigureNginx
 
-    NGINX_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" nginx)
+    NGINX_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" nginx)
     if [ "${NGINX_INITIAL_IP}" != "${NGINX_IP}" ]; then
         LogWarning "NGINX IP has changed from $NGINX_INITIAL_IP to $NGINX_IP"
     fi
 
     # Next do the webapp
-    docker stop webService
-    docker rm webService
+    $ctr_cli stop webService
+    $ctr_cli rm webService
 
     BuildAndRunWebService
 
-    WEBAPP_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" webService)
+    WEBAPP_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
     if [ "${WEBAPP_INITIAL_IP}" != "${WEBAPP_IP}" ]; then
         LogWarning "Simple Web App IP has changed from $WEBAPP_INITIAL_IP to $WEBAPP_IP"
     fi
 
     # next the proxy?
-    PROXY_ENABLED=$(docker container ls | grep proxy)
+    PROXY_ENABLED=$($ctr_cli container ls | grep proxy)
     if [ "${PROXY_ENABLED}" ]; then
-        docker stop proxy
-        docker rm proxy
+        $ctr_cli stop proxy
+        $ctr_cli rm proxy
 
         BuildAndRunProxy
 
-        PROXY_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" proxy)
+        PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
         if [ "${PROXY_INITIAL_IP}" != "${PROXY_IP}" ]; then
             LogWarning "Proxy IP has changed from $PROXY_INITIAL_IP to $PROXY_IP, make sure to update your VPN profile to reflect this."
         fi
     fi
 
     # Last, unbound
-    docker stop unbound
-    docker rm unbound
-    docker volume rm unbound
+    $ctr_cli stop unbound
+    $ctr_cli rm unbound
+    $ctr_cli volume rm unbound
 
     ConfigureUnbound
 
-    UNBOUND_IP=$(docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound)
+    UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
     if [ "$UNBOUND_INITIAL_IP" != "$UNBOUND_IP" ]; then
         LogWarning "DNS Server IP has changed from $UNBOUND_INITIAL_IP to $UNBOUND_IP, make sure to update your Tunnel Server Configuration to reflect this."
+    fi
+}
+
+DetectEnvironment() {
+    . vars
+
+    if [ -f "/etc/debian_version" ]; then
+        # debian
+        ctr_cli="docker"
+        installer="apt-get"
+        update_command="apt-get update"
+        ctr_package_name="docker.io"
+        network_name="bridge"
+    else
+        # RHEL
+        ctr_cli="podman"
+        installer="dnf"
+        update_command="dnf -y update"
+        ctr_package_name="@container-tools"
+        network_name="podman"
+        # open up port 443
+        firewall-cmd --zone=public --add-port=443/tcp
+        firewall-cmd --zone=public --add-port=443/udp
+        firewall-cmd --zone=public --permanent --add-port=443/tcp
+        firewall-cmd --zone=public --permanent --add-port=443/udp
     fi
 }
 
@@ -530,8 +554,7 @@ Update(){
 #                                          Main()                                         #
 #                                                                                         #
 ###########################################################################################
-
-. vars
+DetectEnvironment
 
 while getopts "hripeu" options
 do
