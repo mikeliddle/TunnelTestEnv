@@ -241,7 +241,7 @@ Function Initialize-SetupScript {
         chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
         
         PUBLIC_IP=`$(curl ifconfig.me)
-        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
+        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" -e "s/PROXY_ALLOWED_NAMES=/PROXY_ALLOWED_NAMES=(.$($ServerName) .$($FQDN) ".bing.com" .webapp.$($FQDN) .trusted.$($FQDN))/" -e "s/PROXY_BYPASS_NAMES=/PROXY_BYPASS_NAMES=(\"google.com\")/" vars
         export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
         
         ./setup-expect.sh
