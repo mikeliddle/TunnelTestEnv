@@ -277,7 +277,7 @@ Function Update-PrivateDNSAddress {
     {
         $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
     }
-    $newServers = $DNSPrivateAddress
+    $newServers = $DNSPrivateAddress #+ $ServerConfiguration.DnsServers
     Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
 }
@@ -505,6 +505,8 @@ Function New-IosTrustedRootPolicy {
 
             Write-Header "Creating Trusted Root Policy..."
             $script:TrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+            # re-fetch the policy so the root certificate is included
+            $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
         } finally {
             Remove-Item $cerFileName
         } 
@@ -556,7 +558,7 @@ Function New-IosAppConfigurationPolicy{
                         lastModifiedDateTime = $TrustedRootPolicy.LastModifiedDateTime
                         trustedRootCertificate = $TrustedRootPolicy.AdditionalProperties.trustedRootCertificate
                     }
-                ) | ConvertTo-Json -Depth 10 -AsArray)
+                ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
             }
         )
 
@@ -580,17 +582,6 @@ Function New-IosAppConfigurationPolicy{
         }
         $body = @{
             apps = $targetedApps
-            appGroupType = "selectedPublicApps"
-            customSettings = $customSettings
-            displayName = $DisplayName
-            targetedAppManagementLevels = "unspecified"
-        } | ConvertTo-Json -Depth 10
-
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
-        $script:AppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
-
-        Write-Header "Assigning App Configuration policy '$DisplayName' to group '$($Group.DisplayName)'..."
-        $Body = @{
             assignments = @(
                 @{
                     target = @{
@@ -601,9 +592,17 @@ Function New-IosAppConfigurationPolicy{
                     }
                 }
             )
-        } | ConvertTo-Json -Depth 10
+            appGroupType = "selectedPublicApps"
+            customSettings = $customSettings
+            displayName = $DisplayName
+            description = ""
+            roleScopeTagIds = @()
+            scSettings = @()
+            targetedAppManagementLevels = "unspecified"
+        } | ConvertTo-Json -Depth 10 -Compress
 
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations('$($AppConfigurationPolicy.Id)')/assign" -Body $Body
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
+        $script:AppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
     }
 }
 
