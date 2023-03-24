@@ -366,7 +366,7 @@ Function Update-ADApplication {
     $script:App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
     if($App) {
         Write-Success "Client Id: $($App.AppId)"
-        Write-Success "Tenant Id: $($App.PublisherDomain)"
+        Write-Success "Tenant Id: $($GraphContext.TenantId)"
 
         if ($BundleIds -and $BundleIds.Count -gt 0){
             Write-Header "Found AD Application '$ADApplication'..."
@@ -448,7 +448,7 @@ Function Update-ADApplication {
         $script:App = New-MgApplication -DisplayName $ADApplication -RequiredResourceAccess $RequiredResourceAccess -OptionalClaims $OptionalClaims -PublicClient $PublicClient -SignInAudience "AzureADMyOrg"
 
         Write-Success "Client Id: $($App.AppId)"
-        Write-Success "Tenant Id: $($App.PublisherDomain)"
+        Write-Success "Tenant Id: $($GraphContext.TenantId)"
 
         Write-Header "You will need to grant consent. Opening browser in 15 seconds..."
         Start-Sleep -Seconds 15
