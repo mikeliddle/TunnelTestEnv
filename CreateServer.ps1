@@ -47,6 +47,10 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [pscredential]$VmTenantCredential,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [pscredential]$TenantCredential,
 
@@ -66,6 +70,7 @@ param(
 )
 
 $script:Account = $null
+$script:GraphContext = $null
 $script:Subscription = $null
 $script:ResourceGroup = $null
 $script:SSHKeyPath = $null
@@ -110,12 +115,16 @@ Function Test-Prerequisites {
 
 Function Login {
     if (-Not $ProfilesOnly) {
-        Write-Header "Select the account to manage the VM."
-        az login --only-show-errors | Out-Null
+        Write-Header "Logging into Azure..."
+        if (-Not $VmTenantCredential) {
+            Write-Header "Select the account to manage the VM."
+            az login --only-show-errors | Out-Null
+        } else {
+            az login -u $VmTenantCredential.UserName -p $VmTenantCredential.GetNetworkCredential().Password --only-show-errors | Out-Null
+        }
     }
     
     Write-Header "Logging into graph..."
-
     if (-Not $TenantCredential) {    
         Write-Header "Select the account to manage the profiles."
         $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT"
@@ -153,6 +162,8 @@ Function Initialize-Variables {
 
     $script:ResourceGroup = "$VmName-group"
     $script:SSHKeyPath = "~/.ssh/$VmName"
+
+    $script:GraphContext = Get-MgContext
 
     if (-Not $Delete) {
         # We only need a group name for the create flow
@@ -298,7 +309,7 @@ Function New-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$VmName'" -Limit 1
     if ($ServerConfiguration) {
-        Write-Header "Already found Server Configuration named '$VmName'"
+        Write-Host "Already found Server Configuration named '$VmName'"
     } else {
         $ListenPort = 443
         $DnsServers = @("8.8.8.8")
@@ -321,7 +332,7 @@ Function New-TunnelSite {
     Write-Header "Creating Site..."
     $script:Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$VmName'" -Limit 1
     if ($Site) {
-        Write-Header "Already found Site named '$VmName'"
+        Write-Host "Already found Site named '$VmName'"
     } else {
         $script:Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $VmName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id=$ServerConfiguration.id} -RoleScopeTagIds @("0") -UpgradeAutomatically    
     }
@@ -445,11 +456,21 @@ Function Update-ADApplication {
     }
 }
 
+Function New-GeneratedXCConfig {
+    $bundle = $BundleIds[0]
+    $Content = @"
+CONFIGURED_BUNDLE_IDENTIFIER = $bundle
+CONFIGURED_TENANT_ID = $($GraphContext.TenantId)
+CONFIGURED_CLIENT_ID = $($App.AppId)
+"@
+    Set-Content -Path "./Generated.xcconfig" -Value $Content -Force
+}
+
 Function New-IosAppProtectionPolicy{
     $DisplayName = "$VmName-Protection"
     $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($AppProtectionPolicy) {
-        Write-Header "Already found App Protection policy named '$DisplayName'"
+        Write-Host "Already found App Protection policy named '$DisplayName'"
     } else {
         Write-Header "Creating App Protection policy '$DisplayName'..."
         $script:AppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
@@ -505,7 +526,7 @@ Function New-IosTrustedRootPolicy {
     $DisplayName = "$VmName-TrustedRoot"
     $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
     if($TrustedRootPolicy) {
-        Write-Header "Already found Trusted Root policy named '$DisplayName'"
+        Write-Host "Already found Trusted Root policy named '$DisplayName'"
     } else {
         $cerFileName = "./$([System.Guid]::NewGuid().ToString())$VmName.pem"
         try{
@@ -546,7 +567,7 @@ Function New-IosAppConfigurationPolicy{
     $DisplayName = "$VmName-Configuration"
     $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($script:AppConfigurationPolicy) {
-        Write-Header "Already found App Configuration policy named '$DisplayName'"
+        Write-Host "Already found App Configuration policy named '$DisplayName'"
     } else {
         Write-Header "Creating App Configuration policy '$DisplayName'..."
         $customSettings = @(
@@ -669,6 +690,7 @@ Function Create-Flow {
     Update-PrivateDNSAddress
     
     Update-ADApplication
+    New-GeneratedXCConfig
 
     New-IosTrustedRootPolicy
     New-IosAppProtectionPolicy
@@ -702,6 +724,7 @@ Function ProfilesOnly-Flow {
     New-TunnelSite
 
     Update-ADApplication
+    New-GeneratedXCConfig
     New-IosTrustedRootPolicy
     New-IosAppProtectionPolicy
     New-IosAppConfigurationPolicy
