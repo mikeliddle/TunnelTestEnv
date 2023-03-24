@@ -14,6 +14,11 @@ param(
     [string]$GroupName,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [ValidateSet("ios","android","all")]
+    [string]$Platform="all",
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
 
@@ -82,7 +87,7 @@ $script:Group = $null
 $script:AppProtectionPolicy = $null
 $script:AppConfigurationPolicy = $null
 $script:TrustedRootPolicy = $null
-$script:Platform = ""
+$script:RunningOS = ""
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -105,11 +110,11 @@ Function Test-Prerequisites {
     }
 
     if ($IsLinux) {
-        $script:Platform = "linux"
+        $script:RunningOS = "linux"
     } elseif ($IsMacOS) {
-        $script:Platform = "osx"
+        $script:RunningOS = "osx"
     } else {
-        $script:Platform = "win"
+        $script:RunningOS = "win"
     }
 }
 
@@ -127,9 +132,9 @@ Function Login {
     Write-Header "Logging into graph..."
     if (-Not $TenantCredential) {    
         Write-Header "Select the account to manage the profiles."
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT"
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
     } else {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
     }
     
     if (-Not $JWT) {
@@ -467,7 +472,7 @@ CONFIGURED_CLIENT_ID = $($App.AppId)
 }
 
 Function New-IosAppProtectionPolicy{
-    $DisplayName = "$VmName-Protection"
+    $DisplayName = "ios-$VmName-Protection"
     $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($AppProtectionPolicy) {
         Write-Host "Already found App Protection policy named '$DisplayName'"
@@ -512,7 +517,7 @@ Function New-IosAppProtectionPolicy{
 }
 
 Function Remove-IosAppProtectionPolicy{
-    $DisplayName = "$VmName-Protection"
+    $DisplayName = "ios-$VmName-Protection"
     Write-Header "Deleting App Protection Policy '$DisplayName'..."
     $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if($AppProtectionPolicy) {
@@ -523,7 +528,7 @@ Function Remove-IosAppProtectionPolicy{
 }
 
 Function New-IosTrustedRootPolicy {
-    $DisplayName = "$VmName-TrustedRoot"
+    $DisplayName = "ios-$VmName-TrustedRoot"
     $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
     if($TrustedRootPolicy) {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
@@ -546,14 +551,25 @@ Function New-IosTrustedRootPolicy {
             $script:TrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
             # re-fetch the policy so the root certificate is included
             $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+            
+            $Body = @{
+                "assignments" = @(@{
+                    "target" = @{
+                        "groupId" = $Group.Id
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                })
+            }
+        
+            Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($DeviceConfigurationPolicy.Id)/assign" -Body $Body
         } finally {
             Remove-Item $cerFileName
         } 
-    }                     
+    }
 }
 
 Function Remove-IosTrustedRootPolicy{
-    $DisplayName = "$VmName-TrustedRoot"
+    $DisplayName = "ios-$VmName-TrustedRoot"
     Write-Header "Deleting Trusted Root Policy '$DisplayName'..."
     $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
     if($TrustedRootPolicy) {
@@ -563,8 +579,63 @@ Function Remove-IosTrustedRootPolicy{
     }
 }
 
+Function New-IosDeviceConfigurationPolicy{
+    $DisplayName = "ios-$VmName-DeviceConfiguration"
+    $script:DeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if($DeviceConfigurationPolicy) {
+        Write-Host "Already found Device Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating Device Configuration policy '$DisplayName'..."
+        $Body = @{
+            "@odata.type" = "#microsoft.graph.iosVpnConfiguration"
+            displayName = $DisplayName
+            id = [System.Guid]::Empty.ToString()
+            roleScopeTagIds = @("0")
+            authenticationMethod = "usernameAndPassword"
+            connectionType = "microsoftTunnel"
+            connectionName = $DisplayName
+            microsoftTunnelSiteId = $Site.Id
+            server = @{
+                address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+                description = ""
+            }
+            proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
+            customData = @(@{
+                key = "MSTunnelProtectMode"
+                value = "1"
+            })
+            enableSplitTunneling = $false
+        } | ConvertTo-Json -Depth 10
+
+        $script:DeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+
+        $Body = @{
+            "assignments" = @(@{
+                "target" = @{
+                    "groupId" = $Group.Id
+                    "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                }
+            })
+        }
+    
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($DeviceConfigurationPolicy.Id)/assign" -Body $Body
+    }
+}
+
+Function Remove-IosDeviceConfigurationPolicy{
+    $DisplayName = "ios-$VmName-DeviceConfiguration"
+    Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
+    $script:DeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if($DeviceConfigurationPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $DeviceConfigurationPolicy.Id
+    } else {
+        Write-Host "Device Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
 Function New-IosAppConfigurationPolicy{
-    $DisplayName = "$VmName-Configuration"
+    $DisplayName = "ios-$VmName-Configuration"
     $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($script:AppConfigurationPolicy) {
         Write-Host "Already found App Configuration policy named '$DisplayName'"
@@ -646,7 +717,7 @@ Function New-IosAppConfigurationPolicy{
 }
 
 Function Remove-IosAppConfigurationPolicy{
-    $DisplayName = "$VmName-Configuration"
+    $DisplayName = "ios-$VmName-Configuration"
     Write-Header "Deleting App Configuration Policy '$DisplayName'..."
     $script:AppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if($AppConfigurationPolicy) {
@@ -656,17 +727,160 @@ Function Remove-IosAppConfigurationPolicy{
     }
 }
 
+Function New-AndroidTrustedRootPolicy{
+    $DisplayName = "android-$VmName-RootCertificate"
+    $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if($TrustedRootPolicy) {
+        Write-Host "Already found Trusted Root policy named '$DisplayName'"
+    } else {
+        $cerFileName = "./$([System.Guid]::NewGuid().ToString())$VmName.pem"
+        try{
+            Write-Header "Copying root certificate locally..."
+            scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN):/etc/pki/tls/certs/cacert.pem" $cerFileName > $null 
+            $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----","").Replace("-----END CERTIFICATE-----","") -join ""
+            
+            $Body = @{
+                "@odata.type" = "#microsoft.graph.androidTrustedRootCertificate"
+                displayName = $DisplayName
+                id = [System.Guid]::Empty.ToString()
+                roleScopeTagIds = @("0")
+                trustedRootCertificate = $certValue
+            } | ConvertTo-Json -Depth 10
+
+            Write-Header "Creating Trusted Root Policy..."
+            $script:TrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+            # re-fetch the policy so the root certificate is included
+            $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+            $Body = @{
+                "assignments" = @(@{
+                    "target" = @{
+                        "groupId" = $Group.Id
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                })
+            }
+        
+            Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($DeviceConfigurationPolicy.Id)/assign" -Body $Body
+        } finally {
+            Remove-Item $cerFileName
+        } 
+    }
+}
+
+Function Remove-AndroidTrustedRootPolicy{
+    $DisplayName = "android-$VmName-RootCertificate"
+    Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
+    $script:DeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if($DeviceConfigurationPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $DeviceConfigurationPolicy.Id
+    } else {
+        Write-Host "Device Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
+Function New-AndroidDeviceConfigurationPolicy{
+    $DisplayName = "android-$VmName-DeviceConfiguration"
+    $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if($DeviceConfigurationPolicy) {
+        Write-Host "Already found Device Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating Device Configuration policy '$DisplayName'..."
+        $Body = @{
+            "@odata.type" = "#microsoft.graph.androidVpnConfiguration"
+            displayName = $DisplayName
+            id = [System.Guid]::Empty.ToString()
+            roleScopeTagIds = @("0")
+            authenticationMethod = "usernameAndPassword"
+            connectionType = "microsoftTunnel"
+            connectionName = $DisplayName
+            microsoftTunnelSiteId = $Site.Id
+            server = @{
+                address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+                description = ""
+            }
+            proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
+            customData = @(@{
+                key = "MSTunnelProtectMode"
+                value = "1"
+            })
+            enableSplitTunneling = $false
+        } | ConvertTo-Json -Depth 10
+
+        $script:DeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+
+        $Body = @{
+            "assignments" = @(@{
+                "target" = @{
+                    "groupId" = $Group.Id
+                    "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                }
+            })
+        }
+    
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($DeviceConfigurationPolicy.Id)/assign" -Body $Body
+    }
+}
+
+Function Remove-AndroidDeviceConfigurationPolicy{
+    $DisplayName = "android-$VmName-DeviceConfiguration"
+    Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
+    $script:DeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if($DeviceConfigurationPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $DeviceConfigurationPolicy.Id
+    } else {
+        Write-Host "Device Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
+Function New-AndroidAppProtectionPolicy{
+    $DisplayName = "android-$VmName-AppProtection"
+    $script:TrustedRootPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'"
+}
+
+Function Remove-AndroidAppProtectionPolicy{
+
+}
+
+Function New-AndroidAppConfigurationPolicy{
+    $DisplayName = "android-$VmName-AppConfiguration"
+    $script:TrustedRootPolicy = Get-MGDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'"
+}
+
+Function Remove-AndroidAppConfigurationPolicy{
+
+}
+
 Function New-TunnelAgent{
     if (-Not $TenantCredential) {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe Agent $($Site.Id)"
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
     } else {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$Platform.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
     }
 }
 
 Function New-SSHKeys{
     Write-Header "Generating new RSA 4096 SSH Key"
     ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
+}
+
+Function New-IOSProfiles{
+    if ($Platform -eq "ios" -or $Platform -eq "all") {
+        New-IosTrustedRootPolicy
+        New-IosDeviceConfigurationPolicy
+        New-IosAppProtectionPolicy
+        New-IosAppConfigurationPolicy
+    }
+}
+
+Function New-AndroidProfiles{
+    if ($Platform -eq "android" -or $Platform -eq "all") {
+        New-AndroidTrustedRootPolicy
+        New-AndroidDeviceConfigurationPolicy
+        New-AndroidAppProtectionPolicy
+        New-AndroidAppConfigurationPolicy
+    }
 }
 
 Function Create-Flow {
@@ -677,7 +891,6 @@ Function Create-Flow {
     New-ResourceGroup
     New-VM
     New-NetworkRules
-    # Move-SSHKeys
 
     New-TunnelConfiguration
     New-TunnelSite
@@ -692,9 +905,9 @@ Function Create-Flow {
     Update-ADApplication
     New-GeneratedXCConfig
 
-    New-IosTrustedRootPolicy
-    New-IosAppProtectionPolicy
-    New-IosAppConfigurationPolicy
+    New-IOSProfiles
+    New-AndroidProfiles
+
     Logout
 }
 
@@ -706,9 +919,13 @@ Function Delete-Flow {
     Remove-ResourceGroup
     Remove-SSHKeys
 
+    Remove-IosDeviceConfigurationPolicy
     Remove-IosAppConfigurationPolicy
     Remove-IosAppProtectionPolicy
     Remove-IosTrustedRootPolicy
+    Remove-AndroidAppProtectionPolicy
+    Remove-AndroidTrustedRootPolicy
+    Remove-AndroidDeviceConfigurationPolicy
     Remove-TunnelServers
     Remove-TunnelSite
     Remove-TunnelConfiguration
@@ -725,9 +942,10 @@ Function ProfilesOnly-Flow {
 
     Update-ADApplication
     New-GeneratedXCConfig
-    New-IosTrustedRootPolicy
-    New-IosAppProtectionPolicy
-    New-IosAppConfigurationPolicy
+    
+    New-IOSProfiles
+    New-AndroidProfiles
+
     Logout
 }
 
