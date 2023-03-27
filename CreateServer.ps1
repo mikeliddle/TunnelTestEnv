@@ -127,6 +127,11 @@ Function Login {
         } else {
             az login -u $VmTenantCredential.UserName -p $VmTenantCredential.GetNetworkCredential().Password --only-show-errors | Out-Null
         }
+
+        if ($SubscriptionId) {
+            Write-Header "Setting subscription to $SubscriptionId"
+            az account set --subscription $SubscriptionId | Out-Null
+        }
     }
     
     Write-Header "Logging into graph..."
@@ -276,7 +281,19 @@ Function Initialize-SetupScript {
         
         expect -f ./setup.exp
 "@
-        Set-Content -Path "./Setup.sh" -Value $Content -Force
+
+        $file = Join-Path $pwd -ChildPath "Setup.sh"
+        Set-Content -Path $file -Value $Content -Force
+        
+
+        # Replace CR+LF with LF
+        $text = [IO.File]::ReadAllText($file) -replace "`r`n", "`n"
+        [IO.File]::WriteAllText($file, $text)
+
+        # Replace CR with LF
+        $text = [IO.File]::ReadAllText($file) -replace "`r", "`n"
+        [IO.File]::WriteAllText($file, $text)
+
         Write-Header "Copying setup script to remote server..."
         scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./Setup.sh "$($username)@$($FQDN):~/" > $null
         scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./agent.p12 "$($username)@$($FQDN):~/" > $null
