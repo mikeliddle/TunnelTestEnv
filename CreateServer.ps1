@@ -166,7 +166,7 @@ Function Initialize-Variables {
     }
 
     $script:ResourceGroup = "$VmName-group"
-    $script:SSHKeyPath = "~/.ssh/$VmName"
+    $script:SSHKeyPath = "$HOME/.ssh/$VmName"
 
     $script:GraphContext = Get-MgContext
 
@@ -792,24 +792,23 @@ Function New-AndroidDeviceConfigurationPolicy{
     } else {
         Write-Header "Creating Device Configuration policy '$DisplayName'..."
         $Body = @{
-            "@odata.type" = "#microsoft.graph.androidVpnConfiguration"
+            "@odata.type" = "#microsoft.graph.androidWorkProfileVpnConfiguration"
             displayName = $DisplayName
             id = [System.Guid]::Empty.ToString()
             roleScopeTagIds = @("0")
-            authenticationMethod = "usernameAndPassword"
-            connectionType = "microsoftTunnel" # ERROR HERE
+            authenticationMethod = "azureAD"
+            connectionType = "microsoftProtect"
             connectionName = $DisplayName
             microsoftTunnelSiteId = $Site.Id
-            server = @{
+            servers = @(@{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
-            }
+            })
             proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
             customData = @(@{
-                key = "MSTunnelProtectMode"
-                value = "1"
+                key = "MicrosoftDefenderAppSettings"
+                value = $null
             })
-            enableSplitTunneling = $false
         } | ConvertTo-Json -Depth 10
 
         $script:AndroidDeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
@@ -845,7 +844,7 @@ Function New-AndroidAppProtectionPolicy{
         Write-Host "Already found App Protection policy named '$DisplayName'"
     } else {
         Write-Header "Creating App Protection policy '$DisplayName'..."
-        $script:AndroidAppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
+        # $script:AndroidAppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
         Write-Header "Targeting bundles to '$DisplayName'..."
 
         $customApps = $BundleIds | ForEach-Object { 
@@ -878,12 +877,13 @@ Function New-AndroidAppProtectionPolicy{
         $targetedApps = $customApps + $defaultApps
 
         $body = @{
+            displayName = $DisplayName
             apps = $targetedApps
             appGroupType = "selectedPublicApps"
             connectToVpnOnLaunch = $true
         } | ConvertTo-Json -Depth 10
         
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/androidManagedAppProtections('$($AndroidAppProtectionPolicy.Id)')/targetApps" -Body $Body
+        $script:AndroidAppProtectionPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/androidManagedAppProtections" -Body $Body
         
         Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
         $Body = @{
