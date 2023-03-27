@@ -187,18 +187,18 @@ Function Initialize-Variables {
 
 Function New-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
-    if ([bool](az group show --name $resourceGroup --subscription $Subscription 2> $null)) {
+    if ([bool](az group show --name $resourceGroup --subscription $Subscription | Out-Null )) {
         Write-Error "Group '$resourceGroup' already exists"
         exit -1
     }
     
     Write-Header "Creating resource group '$resourceGroup'..."
-    $groupData = az group create --subscription $subscription --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
+    az group create --subscription $subscription --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
 }
 
 Function Remove-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
-    if ([bool](az group show --name $resourceGroup --subscription $Subscription 2> $null)) {
+    if ([bool](az group show --name $resourceGroup --subscription $Subscription | Out-Null)) {
         Write-Header "Deleting resource group '$resourceGroup'..."
         az group delete --name $resourceGroup --yes --no-wait
     } else {
