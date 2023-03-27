@@ -914,7 +914,14 @@ Function New-AndroidAppProtectionPolicy{
                     }
                 }
             )
-        } | ConvertTo-Json -Depth 10
+            appGroupType = "selectedPublicApps"
+            customSettings = $customSettings
+            displayName = $DisplayName
+            description = ""
+            roleScopeTagIds = @()
+            scSettings = @()
+            targetedAppManagementLevels = "unspecified"
+        } | ConvertTo-Json -Depth 10 -Compress
 
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/androidManagedAppProtections('$($AndroidAppProtectionPolicy.Id)')/assign" -Body $Body
     }
@@ -1137,6 +1144,7 @@ Function Delete-Flow {
     Remove-AndroidAppProtectionPolicy
     Remove-AndroidTrustedRootPolicy
     Remove-AndroidDeviceConfigurationPolicy
+
     Remove-TunnelServers
     Remove-TunnelSite
     Remove-TunnelConfiguration
