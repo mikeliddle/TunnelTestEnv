@@ -1,5 +1,6 @@
 using TodoApi.Models;
 using TodoApi.Contexts;
+using System.Linq;
 
 namespace TodoApi.Common{
     public static class Utils
