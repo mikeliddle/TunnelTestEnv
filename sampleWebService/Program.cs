@@ -1,6 +1,7 @@
-using Microsoft.EntityFrameworkCore;
 using TodoApi.Contexts;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Authentication.Certificate;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,6 +14,8 @@ builder.Services.AddDbContext<TodoContext>(opt =>
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddAuthentication(CertificateAuthenticationDefaults.AuthenticationScheme)
+    .AddCertificate();
 
 var app = builder.Build();
 
@@ -35,6 +38,7 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 
 app.UseHttpsRedirection();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
