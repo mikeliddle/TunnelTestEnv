@@ -140,7 +140,7 @@ ReplaceNames() {
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
-    sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" proxy/etc/squid/squid.conf
+    sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" proxy/squid.conf
 }
 
 ###########################################################################################
@@ -314,14 +314,15 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    $ctr_cli build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile > proxy.log
     $ctr_cli run -d \
             --name proxy \
+            -p 3128:3128 \
             --restart always \
             --volume /etc/squid \
+            -v proxy/squid.conf:/etc/squid/squid.conf \
             --dns "$UNBOUND_IP" \
             --dns-search "$DOMAIN_NAME" \
-            ubuntu:squid >> proxy.log 2>&1
+            ubuntu/squid >> proxy.log 2>&1
 
     PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
@@ -333,7 +334,7 @@ BuildAndRunProxy() {
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
 
-    $ctr_cli cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
+    $ctr_cli cp proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
     $ctr_cli restart proxy >> proxy.log 2>&1
 
     PROXY_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" proxy)
