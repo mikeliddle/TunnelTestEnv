@@ -1,8 +1,7 @@
-using System;
-using System.IO;
 using System.Security.Cryptography.X509Certificates;
 
-namespace CertificateApi.Common{
+namespace CertificateApi.Common
+{
     public static class CertificateUtils
     {
         public static bool ValidateCertificate(X509Certificate2 clientCertificate)

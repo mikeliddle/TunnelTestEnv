@@ -1,13 +1,10 @@
-using TodoApi.Contexts;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Authentication.Certificate;
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using CertificateApi.Common;
 using System.Security.Cryptography.X509Certificates;
-using System.Threading.Tasks;
+
+using CertificateApi.Common;
+using TodoApi.Contexts;
 
 var builder = WebApplication.CreateBuilder(args);
 

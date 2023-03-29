@@ -3,9 +3,6 @@ using Microsoft.EntityFrameworkCore;
 using TodoApi.Models;
 using TodoApi.Contexts;
 using TodoApi.Common;
-using System.Threading.Tasks;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace TodoApi.Controllers
 {

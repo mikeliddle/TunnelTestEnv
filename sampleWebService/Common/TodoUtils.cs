@@ -1,8 +1,8 @@
 using TodoApi.Models;
 using TodoApi.Contexts;
-using System.Linq;
 
-namespace TodoApi.Common{
+namespace TodoApi.Common
+{
     public static class Utils
     {
         public static bool TodoItemExists(TodoContext context, long id)
