@@ -186,6 +186,7 @@ ConfigureCerts() {
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
+    openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -passout pass: >> certs.log 2>&1
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
@@ -359,6 +360,7 @@ PrintConf() {
     echo "  https://trusted.${DOMAIN_NAME}"
     echo "  https://untrusted.${DOMAIN_NAME}"
     echo "  https://webapp.${DOMAIN_NAME}"
+    echo "  https://excluded.${DOMAIN_NAME}"
     echo "  http://${DOMAIN_NAME}"
     echo -e "==================================================================================================\e[0m"
 }
