@@ -174,6 +174,7 @@ ConfigureCerts() {
     openssl genrsa -out private/cakey.pem 4096 >> certs.log 2>&1
     openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
         -out certs/cacert.pem >> certs.log 2>&1
+    openssl pkcs12 -export -out private/cacert.pfx -inkey private/cakey.pem -in certs/cacert.pem -passout pass: >> certs.log 2>&1
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup CA cert"
@@ -188,6 +189,18 @@ ConfigureCerts() {
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
+        exit 1
+    fi
+
+    # generate user cert from our CA
+    openssl genrsa -out private/user.key 4096 >> certs.log 2>&1
+    openssl req -new -key private/user.key -out req/user.csr -config user.conf >> certs.log 2>&1
+    openssl x509 -req -days 365 -in req/user.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+        -CAcreateserial -out certs/user.pem -extensions req_ext -extfile user.conf >> certs.log 2>&1
+    openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass: >> certs.log 2>&1
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup User cert"
         exit 1
     fi
 
