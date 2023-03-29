@@ -283,6 +283,7 @@ ConfigureNginx() {
     $ctr_cli cp nginx_data/ nginx:/etc/volume/
     $ctr_cli cp /etc/pki/tls/certs/ nginx:/etc/volume/
     $ctr_cli cp /etc/pki/tls/private/ nginx:/etc/volume/
+    $ctr_cli cp /etc/pki/tls/private/user.pfx nginx:/etc/volume/nginx_data/user.pfx
 
     $ctr_cli restart nginx >> nginx.log 2>&1
 
