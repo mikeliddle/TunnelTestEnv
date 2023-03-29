@@ -365,18 +365,45 @@ BuildAndRunWebService() {
     $ctr_cli build -t samplewebservice . > webService.log
 
     $ctr_cli run -d \
-        --name=webService \
+        --name=webApp \
         --restart=unless-stopped \
         -p 80:80 \
+        -p 443:443 \
+        -e ASPNETCORE_URLS="https://+;http://+" \
+        -e ASPNETCORE_HTTPS_PORT=443 \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/server.pfx \
+        -v /etc/pki/tls/private:/https/ \
+        samplewebservice >> webService.log 2>&1
+
+    $ctr_cli run -d \
+        --name=excluded \
+        --restart=unless-stopped \
+        -p 80:80 \
+        -p 443:443 \
+        -e ASPNETCORE_URLS="https://+;http://+" \
+        -e ASPNETCORE_HTTPS_PORT=443 \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/server.pfx \
+        -v /etc/pki/tls/private:/https/ \
         samplewebservice >> webService.log 2>&1
 
     cd $current_dir
 
-    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webApp)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 
-    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webService)
+    EXCLUDED_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" excluded)
+    sed -i "s/##EXCLUDED_IP##/${EXCLUDED_IP}/g" *.d/*.conf
+
+    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webApp)
     if [ "$WEBSERVICE_HEALTH" != "running" ]; then
+        LogError "Failed to setup .NET server container"
+        exit 1
+    fi
+
+    EXCLUDED_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" excluded)
+    if [ "$EXCLUDED_HEALTH" != "running" ]; then
         LogError "Failed to setup .NET server container"
         exit 1
     fi
