@@ -1101,7 +1101,7 @@ Function New-AndroidProfiles{
     }
 }
 
-Function Create-Flow {
+Function New-TunnelEnvironment {
     Test-Prerequisites
     Login
     Initialize-Variables
@@ -1129,7 +1129,7 @@ Function Create-Flow {
     Logout
 }
 
-Function Delete-Flow {
+Function Remove-TunnelEnvironment {
     Test-Prerequisites
     Login
     Initialize-Variables
@@ -1151,7 +1151,8 @@ Function Delete-Flow {
     Logout
 }
 
-Function ProfilesOnly-Flow {
+
+Function New-ProfilesOnlyEnvironment {
     Test-Prerequisites
     Login
     Initialize-Variables
@@ -1169,11 +1170,11 @@ Function ProfilesOnly-Flow {
 }
 
 if ($ProfilesOnly) {
-    ProfilesOnly-Flow
+    New-ProfilesOnlyEnvironment
 } else {
     if ($Delete) {
-        Delete-Flow
+        Remove-TunnelEnvironment
     } else {
-        Create-Flow
+        New-TunnelEnvironment
     }
 }
