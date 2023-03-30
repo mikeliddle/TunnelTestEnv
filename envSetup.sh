@@ -317,7 +317,7 @@ BuildAndRunProxy() {
 
     $ctr_cli run -d \
             --name proxy \
-            -p 3128:3128 \
+            -p 3128 \
             --restart always \
             --volume /etc/squid \
             -v proxy/squid.conf:/etc/squid/squid.conf \
@@ -384,8 +384,8 @@ BuildAndRunWebService() {
     $ctr_cli run -d \
         --name=webApp \
         --restart=unless-stopped \
-        -p 80:80 \
-        -p 443:443 \
+        -p 80 \
+        -p 443 \
         -e ASPNETCORE_URLS="https://+;http://+" \
         -e ASPNETCORE_HTTPS_PORT=443 \
         -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
@@ -396,8 +396,8 @@ BuildAndRunWebService() {
     $ctr_cli run -d \
         --name=excluded \
         --restart=unless-stopped \
-        -p 80:80 \
-        -p 443:443 \
+        -p 80 \
+        -p 443 \
         -e ASPNETCORE_URLS="https://+;http://+" \
         -e ASPNETCORE_HTTPS_PORT=443 \
         -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
