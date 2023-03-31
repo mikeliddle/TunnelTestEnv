@@ -605,14 +605,14 @@ do
     case "${options}" in
         h)
             Help
-	    exit
+	        exit
             ;;
         r)
             Uninstall
             exit
             ;;
         i)
-            InstallPrereqs     
+            InstallPrereqs
             ;;
         e)
             ENTERPRISE_CA=1
@@ -628,7 +628,7 @@ do
             ;;
         ?)
             Help
-	    exit
+	        exit
             ;;
     esac
 done

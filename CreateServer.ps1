@@ -44,6 +44,10 @@ param(
     [string]$ADApplication = "Generated MAM Tunnel",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [string]$SubscriptionId,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [switch]$NoProxy,
 
