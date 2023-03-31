@@ -49,7 +49,7 @@ Switches:
    2. You can use the `-p` flag to install and configure a squid proxy on port 3128.
 6. Clean up the environment by running `./envSetup.sh -r`. You will need to re-set the vars file after this. 
 
-# Environment explanation
+## Environment explanation
 
 1. Trusted - An NGINX server with a TLS certificate issued by our generated CA.
 2. Untrusted - An NGINX server with a self signed TLS certificate.
@@ -57,5 +57,6 @@ Switches:
 4. WebApp - A docker container serving up a sample web project using the above internally-trusted CA
 5. Unbound - A DNS resolver that will allow requests coming into our server to use the local IP address instead of the public IP address for the specified domain name. This uses port 53 on UDP and TCP.
 6. Proxy - A squid proxy listening on port 3128.
+7. Excluded - A server that will be bypassed by the proxy when using a PAC file.
 
-All these servers are available at the address https://\<hostname\>.\<fqdn\>. The webApp container will show you your origin IP, which will either be the proxy IP or the Tunnel Gateway IP depending on if you are using the proxy or not.
+All these servers are available at the address `https://\<hostname\>.\<fqdn\>`. The webApp container will show you your origin IP, which will either be the proxy IP or the Tunnel Gateway IP depending on if you are using the proxy or not.
