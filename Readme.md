@@ -27,6 +27,7 @@ Optional Parameters:
 - `-AdApplication`: The name of the AAD application to use for authentication. Default is `Generated MAM Tunnel`.
 - `-VMTenantCredential`: a pscredential object used for silent authentication to the VM subscription. Default is to prompt for credentials.
 - `-TenantCredential`: a pscredential object used for silent authentication to the tunnel tenant. Default is to prompt for credentials.
+- `-SubscriptionId`: The subscription ID to use for the VM. Default is to detect this from the VM login information.
 
 Switches:
 
