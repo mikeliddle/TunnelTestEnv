@@ -135,6 +135,16 @@ Function Login {
         if ($SubscriptionId) {
             Write-Header "Setting subscription to $SubscriptionId"
             az account set --subscription $SubscriptionId | Out-Null
+        } else {
+            $accounts = az account list
+            if ($accounts.Count -gt 1) {
+                foreach ($account in $accounts) {
+                    Write-Host "$($account.name) - $($account.id)"
+                }
+                $SubscriptionId = Read-Host "Please specify a subscription id: "
+                Write-Header "Setting subscription to $SubscriptionId"
+                az account set --subscription $SubscriptionId | Out-Null
+            }
         }
     }
     
