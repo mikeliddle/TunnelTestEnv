@@ -1161,6 +1161,7 @@ Function Remove-TunnelEnvironment {
     Remove-IosAppProtectionPolicy
     Remove-IosTrustedRootPolicy
     Remove-AndroidAppProtectionPolicy
+    Remove-AndroidAppConfigurationPolicy
     Remove-AndroidTrustedRootPolicy
     Remove-AndroidDeviceConfigurationPolicy
 
