@@ -88,9 +88,12 @@ $script:ServerConfiguration = $null
 $script:Site = $null
 $script:App = $null
 $script:Group = $null
-$script:AppProtectionPolicy = $null
-$script:AppConfigurationPolicy = $null
-$script:TrustedRootPolicy = $null
+$script:IosAppProtectionPolicy = $null
+$script:AndroidAppProtectionPolicy = $null
+$script:IosAppConfigurationPolicy = $null
+$script:AndroidAppConfigurationPolicy = $null
+$script:IosTrustedRootPolicy = $null
+$script:AndroidTrustedRootPolicy = $null
 $script:RunningOS = ""
 
 Function Write-Header([string]$Message) {
@@ -136,7 +139,7 @@ Function Login {
             Write-Header "Setting subscription to $SubscriptionId"
             az account set --subscription $SubscriptionId | Out-Null
         } else {
-            $accounts = az account list
+            $accounts = (az account list | ConvertFrom-Json)
             if ($accounts.Count -gt 1) {
                 foreach ($account in $accounts) {
                     Write-Host "$($account.name) - $($account.id)"
@@ -504,12 +507,12 @@ CONFIGURED_CLIENT_ID = $($App.AppId)
 
 Function New-IosAppProtectionPolicy{
     $DisplayName = "ios-$VmName-Protection"
-    $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
-    if ($AppProtectionPolicy) {
+    $script:IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($IosAppProtectionPolicy) {
         Write-Host "Already found App Protection policy named '$DisplayName'"
     } else {
         Write-Header "Creating App Protection policy '$DisplayName'..."
-        $script:AppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
+        $script:IosAppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
         Write-Header "Targeting bundles to '$DisplayName'..."
         $targetedApps = $BundleIds | ForEach-Object { 
             @{
@@ -527,7 +530,7 @@ Function New-IosAppProtectionPolicy{
             appGroupType = "selectedPublicApps"
         } | ConvertTo-Json -Depth 10
         
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($AppProtectionPolicy.Id)')/targetApps" -Body $Body
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/targetApps" -Body $Body
         
         Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
         $Body = @{
@@ -543,16 +546,16 @@ Function New-IosAppProtectionPolicy{
             )
         } | ConvertTo-Json -Depth 10
 
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($AppProtectionPolicy.Id)')/assign" -Body $Body
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/assign" -Body $Body
     }
 }
 
 Function Remove-IosAppProtectionPolicy{
     $DisplayName = "ios-$VmName-Protection"
     Write-Header "Deleting App Protection Policy '$DisplayName'..."
-    $script:AppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
-    if($AppProtectionPolicy) {
-        Remove-MgDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $AppProtectionPolicy.Id
+    $script:IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    if($IosAppProtectionPolicy) {
+        Remove-MgDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $IosAppProtectionPolicy.Id
     } else {
         Write-Host "App Protection Policy '$DisplayName' does not exist."
     }
@@ -697,11 +700,11 @@ Function New-IosAppConfigurationPolicy{
                 name="com.microsoft.tunnel.trusted_root_certificates"
                 value= (@(
                     @{
-                        "@odata.type" = $TrustedRootPolicy.AdditionalProperties."@odata.type"
-                        id = $TrustedRootPolicy.Id
-                        displayName = $TrustedRootPolicy.DisplayName
-                        lastModifiedDateTime = $TrustedRootPolicy.LastModifiedDateTime
-                        trustedRootCertificate = $TrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                        "@odata.type" = $IosTrustedRootPolicy.AdditionalProperties."@odata.type"
+                        id = $IosTrustedRootPolicy.Id
+                        displayName = $IosTrustedRootPolicy.DisplayName
+                        lastModifiedDateTime = $IosTrustedRootPolicy.LastModifiedDateTime
+                        trustedRootCertificate = $IosTrustedRootPolicy.AdditionalProperties.trustedRootCertificate
                     }
                 ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
             }
@@ -816,7 +819,7 @@ Function Remove-AndroidTrustedRootPolicy{
 
 Function New-AndroidDeviceConfigurationPolicy{
     $DisplayName = "android-$VmName-DeviceConfiguration"
-    $script:TrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $script:AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if($AndroidDeviceConfigurationPolicy) {
         Write-Host "Already found Device Configuration policy named '$DisplayName'"
@@ -1001,11 +1004,11 @@ Function New-AndroidAppConfigurationPolicy{
                 name="com.microsoft.tunnel.trusted_root_certificates"
                 value= (@(
                     @{
-                        "@odata.type" = $TrustedRootPolicy.AdditionalProperties."@odata.type"
-                        id = $TrustedRootPolicy.Id
-                        displayName = $TrustedRootPolicy.DisplayName
-                        lastModifiedDateTime = $TrustedRootPolicy.LastModifiedDateTime
-                        trustedRootCertificate = $TrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                        "@odata.type" = $AndroidTrustedRootPolicy.AdditionalProperties."@odata.type"
+                        id = $AndroidTrustedRootPolicy.Id
+                        displayName = $AndroidTrustedRootPolicy.DisplayName
+                        lastModifiedDateTime = $AndroidTrustedRootPolicy.LastModifiedDateTime
+                        trustedRootCertificate = $AndroidTrustedRootPolicy.AdditionalProperties.trustedRootCertificate
                     }
                 ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
             }
