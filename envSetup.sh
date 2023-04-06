@@ -335,7 +335,7 @@ BuildAndRunProxy() {
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
 
-    $ctr_cli cp proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
+    $ctr_cli cp $(pwd)/proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
     $ctr_cli restart proxy >> proxy.log 2>&1
 
     PROXY_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" proxy)
