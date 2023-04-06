@@ -320,7 +320,7 @@ BuildAndRunProxy() {
             -p 3128 \
             --restart always \
             --volume /etc/squid \
-            -v proxy/squid.conf:/etc/squid/squid.conf \
+            -v $(pwd)/proxy/squid.conf:/etc/squid/squid.conf \
             --dns "$UNBOUND_IP" \
             --dns-search "$DOMAIN_NAME" \
             ubuntu/squid >> proxy.log 2>&1
