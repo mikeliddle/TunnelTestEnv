@@ -13,6 +13,10 @@ namespace TodoApi.Controllers
         public ActionResult<IPAddressModel> GetIPAddress()
         {
             var ip = Request.Headers["X-Real-IP"];
+            foreach (var header in Request.Headers)
+            {
+                Console.WriteLine(header.Key + ": " + header.Value);
+            }
             return new IPAddressModel() { IPAddress = ip };
         }
     }
