@@ -7,6 +7,14 @@
 </head>
 <body>
     <h2>Accessing site from:<span id="ip_address_span">0.0.0.0</span></h2>
+    <div id="certinfo" style="display: none;">
+        <h2>Certificate Info</h2>
+        <p>Subject: <span id="cert_subject"></span></p>
+        <p>Issuer: <span id="cert_issuer"></span></p>
+        <p>Valid From: <span id="cert_valid_from"></span></p>
+        <p>Valid To: <span id="cert_valid_to"></span></p>
+        <p>Thumbprint: <span id="cert_thumbprint"></span></p>
+    </div>
     <h1>To-do CRUD</h1>
     <h3>Add</h3>
     <form action="javascript:void(0);" method="POST" onsubmit="addItem()">

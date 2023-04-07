@@ -140,7 +140,7 @@ ReplaceNames() {
     sed -i "s/##SERVER_NAME##/${SERVER_NAME}/g" *.d/*.conf
     sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" *.d/*.conf
     sed -i "s/##SERVER_PUBLIC_IP##/${SERVER_PUBLIC_IP}/g" *.d/*.conf
-    sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" proxy/etc/squid/squid.conf
+    sed -i "s/##DOMAIN_NAME##/${DOMAIN_NAME}/g" proxy/squid.conf
 }
 
 ###########################################################################################
@@ -174,6 +174,7 @@ ConfigureCerts() {
     openssl genrsa -out private/cakey.pem 4096 >> certs.log 2>&1
     openssl req -new -x509 -days 3650 -extensions v3_ca -config cacert.conf -key private/cakey.pem \
         -out certs/cacert.pem >> certs.log 2>&1
+    openssl pkcs12 -export -out private/cacert.pfx -inkey private/cakey.pem -in certs/cacert.pem -passout pass: >> certs.log 2>&1
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup CA cert"
@@ -185,9 +186,22 @@ ConfigureCerts() {
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
+    openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -passout pass: >> certs.log 2>&1
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
+        exit 1
+    fi
+
+    # generate user cert from our CA
+    openssl genrsa -out private/user.key 4096 >> certs.log 2>&1
+    openssl req -new -key private/user.key -out req/user.csr -config user.conf >> certs.log 2>&1
+    openssl x509 -req -days 365 -in req/user.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+        -CAcreateserial -out certs/user.pem -extensions req_ext -extfile user.conf >> certs.log 2>&1
+    openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass: >> certs.log 2>&1
+
+    if [ $? -ne 0 ]; then
+        LogError "Failed to setup User cert"
         exit 1
     fi
 
@@ -207,7 +221,7 @@ ConfigureCerts() {
 
 		/root/.acme.sh/acme.sh --upgrade --update-account --accountemail $EMAIL  >> certs.log 2>&1
 
-		/root/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1"  >> certs.log 2>&1
+		/root/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1" --keylength 4096  >> certs.log 2>&1
 
 		cp /root/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem  >> certs.log 2>&1
 		cp /root/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key  >> certs.log 2>&1
@@ -269,6 +283,7 @@ ConfigureNginx() {
     $ctr_cli cp nginx_data/ nginx:/etc/volume/
     $ctr_cli cp /etc/pki/tls/certs/ nginx:/etc/volume/
     $ctr_cli cp /etc/pki/tls/private/ nginx:/etc/volume/
+    $ctr_cli cp /etc/pki/tls/private/user.pfx nginx:/etc/volume/nginx_data/user.pfx
 
     $ctr_cli restart nginx >> nginx.log 2>&1
 
@@ -300,14 +315,15 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
-    $ctr_cli build . --build-arg PROXY_PORT=3128 --tag ubuntu:squid --file proxy/Dockerfile > proxy.log
     $ctr_cli run -d \
             --name proxy \
+            -p 3128 \
             --restart always \
             --volume /etc/squid \
+            -v $(pwd)/proxy/squid.conf:/etc/squid/squid.conf \
             --dns "$UNBOUND_IP" \
             --dns-search "$DOMAIN_NAME" \
-            ubuntu:squid >> proxy.log 2>&1
+            ubuntu/squid >> proxy.log 2>&1
 
     PROXY_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" proxy)
     sed -i "s/##PROXY_IP##/${PROXY_IP}/g" *.d/*.conf
@@ -319,7 +335,7 @@ BuildAndRunProxy() {
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
 
-    $ctr_cli cp proxy/etc/squid/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
+    $ctr_cli cp $(pwd)/proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
     $ctr_cli restart proxy >> proxy.log 2>&1
 
     PROXY_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" proxy)
@@ -346,6 +362,7 @@ PrintConf() {
     echo "  https://trusted.${DOMAIN_NAME}"
     echo "  https://untrusted.${DOMAIN_NAME}"
     echo "  https://webapp.${DOMAIN_NAME}"
+    echo "  https://excluded.${DOMAIN_NAME}"
     echo "  http://${DOMAIN_NAME}"
     echo -e "==================================================================================================\e[0m"
 }
@@ -365,18 +382,45 @@ BuildAndRunWebService() {
     $ctr_cli build -t samplewebservice . > webService.log
 
     $ctr_cli run -d \
-        --name=webService \
+        --name=webApp \
         --restart=unless-stopped \
-        -p 80:80 \
+        -p 80 \
+        -p 443 \
+        -e ASPNETCORE_URLS="https://+;http://+" \
+        -e ASPNETCORE_HTTPS_PORT=443 \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/server.pfx \
+        -v /etc/pki/tls/private:/https/ \
+        samplewebservice >> webService.log 2>&1
+
+    $ctr_cli run -d \
+        --name=excluded \
+        --restart=unless-stopped \
+        -p 80 \
+        -p 443 \
+        -e ASPNETCORE_URLS="https://+;http://+" \
+        -e ASPNETCORE_HTTPS_PORT=443 \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
+        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/server.pfx \
+        -v /etc/pki/tls/private:/https/ \
         samplewebservice >> webService.log 2>&1
 
     cd $current_dir
 
-    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webService)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webApp)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 
-    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webService)
+    EXCLUDED_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" excluded)
+    sed -i "s/##EXCLUDED_IP##/${EXCLUDED_IP}/g" *.d/*.conf
+
+    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webApp)
     if [ "$WEBSERVICE_HEALTH" != "running" ]; then
+        LogError "Failed to setup .NET server container"
+        exit 1
+    fi
+
+    EXCLUDED_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" excluded)
+    if [ "$EXCLUDED_HEALTH" != "running" ]; then
         LogError "Failed to setup .NET server container"
         exit 1
     fi
@@ -561,14 +605,14 @@ do
     case "${options}" in
         h)
             Help
-	    exit
+	        exit
             ;;
         r)
             Uninstall
             exit
             ;;
         i)
-            InstallPrereqs     
+            InstallPrereqs
             ;;
         e)
             ENTERPRISE_CA=1
@@ -584,7 +628,7 @@ do
             ;;
         ?)
             Help
-	    exit
+	        exit
             ;;
     esac
 done

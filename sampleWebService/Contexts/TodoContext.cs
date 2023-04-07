@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using System.Diagnostics.CodeAnalysis;
 using TodoApi.Models;
 
 namespace TodoApi.Contexts
