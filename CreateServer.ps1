@@ -206,18 +206,18 @@ Function Initialize-Variables {
 
 Function New-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
-    if ([bool](az group show --name $resourceGroup --subscription $Subscription | Out-Null )) {
+    if ([bool](az group show --name $resourceGroup 2> $null)) {
         Write-Error "Group '$resourceGroup' already exists"
         exit -1
     }
     
     Write-Header "Creating resource group '$resourceGroup'..."
-    az group create --subscription $subscription --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
+    az group create --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
 }
 
 Function Remove-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
-    if ([bool](az group show --name $resourceGroup --subscription $Subscription | Out-Null)) {
+    if ([bool](az group show --name $resourceGroup 2> $null)) {
         Write-Header "Deleting resource group '$resourceGroup'..."
         az group delete --name $resourceGroup --yes --no-wait
     } else {
@@ -227,7 +227,7 @@ Function Remove-ResourceGroup {
 
 Function New-VM {
     Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --subscription $subscription --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
     $script:FQDN = $vmdata.fqdns
     Write-Host "DNS is '$FQDN'"
 }
@@ -237,10 +237,10 @@ Function New-NetworkRules {
     
     if ($WithSSHOpen)
     {
-        az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
+        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
     }
     
-    az network nsg rule create --subscription $subscription --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
+    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
 Function Move-SSHKeys{
@@ -293,7 +293,7 @@ Function Initialize-SetupScript {
         chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
         
         PUBLIC_IP=`$(curl ifconfig.me)
-        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" -e "s/PROXY_ALLOWED_NAMES=/PROXY_ALLOWED_NAMES=(.$($ServerName) .$($FQDN) ".bing.com" .webapp.$($FQDN) .trusted.$($FQDN))/" -e "s/PROXY_BYPASS_NAMES=/PROXY_BYPASS_NAMES=(\"google.com\")/" vars
+        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" -e "s/PROXY_ALLOWED_NAMES=/PROXY_ALLOWED_NAMES=(.$($ServerName) .$($FQDN) ".bing.com" .webapp.$($FQDN) .trusted.$($FQDN))/" -e "s/PROXY_BYPASS_NAMES=/PROXY_BYPASS_NAMES=(\"google.com\",\"excluded.$($FQDN)\")/" vars
         export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
         
         ./setup-expect.sh
