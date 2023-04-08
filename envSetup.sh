@@ -252,6 +252,7 @@ ConfigureUnbound() {
 
     # copy in necessary config files
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
+    $ctr_cli cp unbound.conf.d/unbound.conf unbound:/opt/unbound/etc/unbound/unbound.conf
     # restart to apply config change
     $ctr_cli restart unbound >> unbound.log 2>&1
 

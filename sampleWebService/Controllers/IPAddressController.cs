@@ -12,7 +12,8 @@ namespace TodoApi.Controllers
         [HttpGet]
         public ActionResult<IPAddressModel> GetIPAddress()
         {
-            var ip = Request.Headers["X-Real-IP"];
+            var ip = Request.HttpContext.Connection.RemoteIpAddress?.MapToIPv4().ToString();
+
             return new IPAddressModel() { IPAddress = ip };
         }
     }
