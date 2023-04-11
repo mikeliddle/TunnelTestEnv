@@ -90,7 +90,13 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string[]]$ExcludeRoutes=@()
+    [string[]]$ExcludeRoutes=@(),
+
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [switch]$WithADFS,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
+    [string]$DomainName
 )
 
 $script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
@@ -1224,6 +1230,67 @@ Function Remove-AndroidAppConfigurationPolicy{
     }
 }
 
+Function New-TunnelAgent{
+    if (-Not $TenantCredential) {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
+    } else {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+    }
+}
+
+Function New-RandomPassword {
+    # Define the character sets to use for the password
+    $lowercaseLetters = "abcdefghijklmnopqrstuvwxyz"
+    $uppercaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    $numbers = "0123456789"
+    $specialCharacters = "!@#$%&*()_+-=[]{};:,./<>?"
+
+    # Combine the character sets into a single string
+    $validCharacters = $lowercaseLetters + $uppercaseLetters + $numbers + $specialCharacters
+
+    # Define the length of the password
+    $passwordLength = 16
+
+    # Generate the password
+    $password = ""
+    for ($i = 0; $i -lt $passwordLength; $i++) {
+        # Get a random index into the valid characters string
+        $randomIndex = Get-Random -Minimum 0 -Maximum $validCharacters.Length
+
+        # Add the character at the random index to the password
+        $password += $validCharacters[$randomIndex]
+    }
+
+    # Output the password
+    return $password
+}
+
+Function New-ADFSEnvironment {
+    Write-Header "Creating ADFS Environment"
+
+    Write-Header "Creating VM '$VmName-dc'..."
+    $AdminPassword = New-RandomPassword
+    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-dc" --image $WindowsServerImage --size $WindowsVmSize --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
+`
+    # Install AD DS role on the first VM and promote it to a domain controller
+    az vm run-command invoke `
+    -g $ResourceGroupName `
+    -n "$($VmName)-dc" `
+    -c RunPowerShellScript `
+    -s @'
+Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+Import-Module ADDSDeployment
+Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "F:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0])" -ForestMode Win2012R2 -InstallDns:$true -LogPath "F:\NTDS" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
+Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "F:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "F:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
+Install-WindowsFeature ADFS-Federation
+'@
+}
+
+Function New-SSHKeys{
+    Write-Header "Generating new RSA 4096 SSH Key"
+    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
+}
+
 Function New-IOSProfiles{
     if ($Platform -eq "ios" -or $Platform -eq "all") {
         New-IosTrustedRootPolicy
@@ -1326,6 +1393,8 @@ if ($ProfilesOnly) {
     New-ProfilesOnlyEnvironment
 } elseif ($Delete) {
     Remove-TunnelEnvironment
+} elseif ($WithADFS) {
+    New-ADFSEnvironment
 } else {
     New-TunnelEnvironment
 }
