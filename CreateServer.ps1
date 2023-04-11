@@ -99,7 +99,13 @@ param(
     [string]$DomainName,
 
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string]$PACUrl
+    [string]$PACUrl,
+    
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [switch]$WithADFS,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
+    [string]$DomainName
 )
 
 $script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
