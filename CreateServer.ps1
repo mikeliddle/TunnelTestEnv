@@ -75,7 +75,14 @@ param(
     [switch]$StayLoggedIn,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [switch]$WithSSHOpen
+    [switch]$WithSSHOpen,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [switch]$WithADFS,
+
+    [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
+    [string]$DomainName
 )
 
 $script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
@@ -1131,7 +1138,7 @@ Function New-ADFSEnvironment {
 
     Write-Header "Creating VM '$VmName-dc'..."
     $AdminPassword = New-RandomPassword
-    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-dc" --image $WindowsServerImage --size $WindowsVmSize --admin-username "azureuser" --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
+    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-dc" --image $WindowsServerImage --size $WindowsVmSize --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
 `
     # Install AD DS role on the first VM and promote it to a domain controller
     az vm run-command invoke `
@@ -1142,7 +1149,7 @@ Function New-ADFSEnvironment {
 Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
 Import-Module ADDSDeployment
 Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "F:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0])" -ForestMode Win2012R2 -InstallDns:$true -LogPath "F:\NTDS" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
-Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$AdminUsername", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "F:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "F:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
+Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "F:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "F:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
 Install-WindowsFeature ADFS-Federation
 '@
 }
@@ -1241,10 +1248,10 @@ Function New-ProfilesOnlyEnvironment {
 
 if ($ProfilesOnly) {
     New-ProfilesOnlyEnvironment
+} elseif ($Delete) {
+    Remove-TunnelEnvironment
+} elseif ($WithADFS) {
+    New-ADFSEnvironment
 } else {
-    if ($Delete) {
-        Remove-TunnelEnvironment
-    } else {
-        New-TunnelEnvironment
-    }
+    New-TunnelEnvironment
 }
