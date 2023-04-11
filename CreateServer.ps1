@@ -645,7 +645,7 @@ Function New-IosDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             }
-            proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
+            proxyServer = @{ automaticConfigurationScriptUrl = "http://trusted/tunnel.pac" }
             customData = @(@{
                 key = "MSTunnelProtectMode"
                 value = "1"
@@ -724,7 +724,7 @@ Function New-IosAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value="http://$($Site.PublicAddress)/tunnel.pac"
+                value="http://trusted/tunnel.pac"
             })
         }
 
@@ -849,7 +849,7 @@ Function New-AndroidDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             })
-            proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
+            proxyServer = @{ automaticConfigurationScriptUrl = "http://trusted/tunnel.pac" }
             customData = @(@{
                 key = "MicrosoftDefenderAppSettings"
                 value = $null
@@ -1028,7 +1028,7 @@ Function New-AndroidAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value="http://$($Site.PublicAddress)/tunnel.pac"
+                value="http://trusted/tunnel.pac"
             })
         }
 
