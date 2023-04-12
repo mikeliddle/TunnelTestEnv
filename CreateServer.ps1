@@ -90,8 +90,6 @@ param(
     [string[]]$ExcludeRoutes=@()
 )
 
-$script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
-$script:WindowsVmSize = "Standard_DS1_v2"
 $script:Account = $null
 $script:GraphContext = $null
 $script:Subscription = $null
