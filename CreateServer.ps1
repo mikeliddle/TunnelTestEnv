@@ -19,7 +19,7 @@ param(
     [string]$Platform="all",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
+    [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","westus3","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -78,19 +78,10 @@ param(
     [switch]$WithSSHOpen,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [switch]$WithADFS,
-
-    [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
-    [string]$DomainName,
-
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string]$PACUrl
 )
 
-$script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
-$script:WindowsVmSize = "Standard_DS1_v2"
 $script:Account = $null
 $script:GraphContext = $null
 $script:Subscription = $null
@@ -195,6 +186,7 @@ Function Logout {
 }
 
 Function Initialize-Variables {
+    $script:VmName = $VmName.ToLower()
     $script:Account = (az account show | ConvertFrom-Json)
     $script:Subscription = $Account.id
     if ($Email -eq "") {
@@ -1144,27 +1136,6 @@ Function New-RandomPassword {
     return $password
 }
 
-Function New-ADFSEnvironment {
-    Write-Header "Creating ADFS Environment"
-
-    Write-Header "Creating VM '$VmName-dc'..."
-    $AdminPassword = New-RandomPassword
-    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-dc" --image $WindowsServerImage --size $WindowsVmSize --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
-`
-    # Install AD DS role on the first VM and promote it to a domain controller
-    az vm run-command invoke `
-    -g $ResourceGroupName `
-    -n "$($VmName)-dc" `
-    -c RunPowerShellScript `
-    -s @'
-Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-Import-Module ADDSDeployment
-Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "F:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0])" -ForestMode Win2012R2 -InstallDns:$true -LogPath "F:\NTDS" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
-Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "F:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "F:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
-Install-WindowsFeature ADFS-Federation
-'@
-}
-
 Function New-SSHKeys{
     Write-Header "Generating new RSA 4096 SSH Key"
     ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
@@ -1261,8 +1232,6 @@ if ($ProfilesOnly) {
     New-ProfilesOnlyEnvironment
 } elseif ($Delete) {
     Remove-TunnelEnvironment
-} elseif ($WithADFS) {
-    New-ADFSEnvironment
 } else {
     New-TunnelEnvironment
 }
