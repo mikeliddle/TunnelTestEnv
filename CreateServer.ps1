@@ -19,7 +19,7 @@ param(
     [string]$Platform="all",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
+    [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","westus3","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -75,7 +75,11 @@ param(
     [switch]$StayLoggedIn,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [switch]$WithSSHOpen
+    [switch]$WithSSHOpen,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [string]$PACUrl
 )
 
 $script:Account = $null
@@ -97,6 +101,7 @@ $script:AndroidAppConfigurationPolicy = $null
 $script:IosTrustedRootPolicy = $null
 $script:AndroidTrustedRootPolicy = $null
 $script:RunningOS = ""
+$script:PACUrl = ""
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -181,6 +186,7 @@ Function Logout {
 }
 
 Function Initialize-Variables {
+    $script:VmName = $VmName.ToLower()
     $script:Account = (az account show | ConvertFrom-Json)
     $script:Subscription = $Account.id
     if ($Email -eq "") {
@@ -193,6 +199,12 @@ Function Initialize-Variables {
     $script:SSHKeyPath = "$HOME/.ssh/$VmName"
 
     $script:GraphContext = Get-MgContext
+
+    $script:FQDN = "$VmName.$Location.cloudapp.azure.com"
+
+    if ($PACUrl -eq "") {
+        $script:PACUrl = "http://$FQDN/tunnel.pac"
+    }
 
     if (-Not $Delete) {
         # We only need a group name for the create flow
@@ -636,7 +648,7 @@ Function New-IosDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             }
-            proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
+            proxyServer = @{ automaticConfigurationScriptUrl = "$PACUrl" }
             customData = @(@{
                 key = "MSTunnelProtectMode"
                 value = "1"
@@ -715,7 +727,7 @@ Function New-IosAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value="http://$($Site.PublicAddress)/tunnel.pac"
+                value=$PACUrl
             })
         }
 
@@ -840,7 +852,7 @@ Function New-AndroidDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             })
-            proxyServer = @{ automaticConfigurationScriptUrl = "http://$($Site.PublicAddress)/tunnel.pac" }
+            proxyServer = @{ automaticConfigurationScriptUrl = "$PACUrl" }
             customData = @(@{
                 key = "MicrosoftDefenderAppSettings"
                 value = $null
@@ -1019,7 +1031,7 @@ Function New-AndroidAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value="http://$($Site.PublicAddress)/tunnel.pac"
+                value="$PACUrl"
             })
         }
 
@@ -1191,10 +1203,8 @@ Function New-ProfilesOnlyEnvironment {
 
 if ($ProfilesOnly) {
     New-ProfilesOnlyEnvironment
+} elseif ($Delete) {
+    Remove-TunnelEnvironment
 } else {
-    if ($Delete) {
-        Remove-TunnelEnvironment
-    } else {
-        New-TunnelEnvironment
-    }
+    New-TunnelEnvironment
 }
