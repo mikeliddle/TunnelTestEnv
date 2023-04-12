@@ -648,7 +648,7 @@ Function New-IosDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             }
-            proxyServer = @{ automaticConfigurationScriptUrl = $PACUrl }
+            proxyServer = @{ automaticConfigurationScriptUrl = "$PACUrl" }
             customData = @(@{
                 key = "MSTunnelProtectMode"
                 value = "1"
@@ -852,7 +852,7 @@ Function New-AndroidDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             })
-            proxyServer = @{ automaticConfigurationScriptUrl = $PACUrl }
+            proxyServer = @{ automaticConfigurationScriptUrl = "$PACUrl" }
             customData = @(@{
                 key = "MicrosoftDefenderAppSettings"
                 value = $null
@@ -1031,7 +1031,7 @@ Function New-AndroidAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value=$PACUrl
+                value="$PACUrl"
             })
         }
 
@@ -1107,33 +1107,6 @@ Function New-TunnelAgent{
     } else {
         $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
     }
-}
-
-Function New-RandomPassword {
-    # Define the character sets to use for the password
-    $lowercaseLetters = "abcdefghijklmnopqrstuvwxyz"
-    $uppercaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    $numbers = "0123456789"
-    $specialCharacters = "!@#$%&*()_+-=[]{};:,./<>?"
-
-    # Combine the character sets into a single string
-    $validCharacters = $lowercaseLetters + $uppercaseLetters + $numbers + $specialCharacters
-
-    # Define the length of the password
-    $passwordLength = 16
-
-    # Generate the password
-    $password = ""
-    for ($i = 0; $i -lt $passwordLength; $i++) {
-        # Get a random index into the valid characters string
-        $randomIndex = Get-Random -Minimum 0 -Maximum $validCharacters.Length
-
-        # Add the character at the random index to the password
-        $password += $validCharacters[$randomIndex]
-    }
-
-    # Output the password
-    return $password
 }
 
 Function New-SSHKeys{
