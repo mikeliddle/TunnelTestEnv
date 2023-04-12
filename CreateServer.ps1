@@ -82,7 +82,11 @@ param(
     [switch]$WithADFS,
 
     [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
-    [string]$DomainName
+    [string]$DomainName,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [string]$PACUrl
 )
 
 $script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
@@ -106,6 +110,7 @@ $script:AndroidAppConfigurationPolicy = $null
 $script:IosTrustedRootPolicy = $null
 $script:AndroidTrustedRootPolicy = $null
 $script:RunningOS = ""
+$script:PACUrl = ""
 
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
@@ -202,6 +207,12 @@ Function Initialize-Variables {
     $script:SSHKeyPath = "$HOME/.ssh/$VmName"
 
     $script:GraphContext = Get-MgContext
+
+    $script:FQDN = "$VmName.$Location.cloudapp.azure.com"
+
+    if ($PACUrl -eq "") {
+        $script:PACUrl = "http://$FQDN/tunnel.pac"
+    }
 
     if (-Not $Delete) {
         # We only need a group name for the create flow
@@ -645,7 +656,7 @@ Function New-IosDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             }
-            proxyServer = @{ automaticConfigurationScriptUrl = "http://trusted/tunnel.pac" }
+            proxyServer = @{ automaticConfigurationScriptUrl = $PACUrl }
             customData = @(@{
                 key = "MSTunnelProtectMode"
                 value = "1"
@@ -724,7 +735,7 @@ Function New-IosAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value="http://trusted/tunnel.pac"
+                value=$PACUrl
             })
         }
 
@@ -849,7 +860,7 @@ Function New-AndroidDeviceConfigurationPolicy{
                 address = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             })
-            proxyServer = @{ automaticConfigurationScriptUrl = "http://trusted/tunnel.pac" }
+            proxyServer = @{ automaticConfigurationScriptUrl = $PACUrl }
             customData = @(@{
                 key = "MicrosoftDefenderAppSettings"
                 value = $null
@@ -1028,7 +1039,7 @@ Function New-AndroidAppConfigurationPolicy{
         if (-Not $NoProxy){
             $customSettings += @(@{
                 name="com.microsoft.tunnel.proxy_pacurl"
-                value="http://trusted/tunnel.pac"
+                value=$PACUrl
             })
         }
 
