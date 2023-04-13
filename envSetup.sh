@@ -304,7 +304,7 @@ ConfigureNginx() {
 BuildAndRunProxy() {
     LogInfo "Setting up squid proxy container"
 
-    PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
+    PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_template)
     UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
