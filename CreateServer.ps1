@@ -592,6 +592,7 @@ Function New-IosTrustedRootPolicy {
                 displayName = $DisplayName
                 id = [System.Guid]::Empty.ToString()
                 roleScopeTagIds = @("0")
+                certFileName = "$VmName.cer"
                 trustedRootCertificate = $certValue
             } | ConvertTo-Json -Depth 10
 
@@ -796,6 +797,7 @@ Function New-AndroidTrustedRootPolicy{
                 displayName = $DisplayName
                 id = [System.Guid]::Empty.ToString()
                 roleScopeTagIds = @("0")
+                certFileName = "$VmName.cer"
                 trustedRootCertificate = $certValue
             } | ConvertTo-Json -Depth 10
 
