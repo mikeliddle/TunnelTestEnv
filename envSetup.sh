@@ -312,7 +312,7 @@ BuildAndRunProxy() {
 
     for pan in "${PROXY_BYPASS_NAMES[@]}"; do
         LogInfo "Proxy bypass name: $pan"
-        panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
+        panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/PROXY_BYPASS_NAME/$pan/")
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
@@ -342,7 +342,6 @@ BuildAndRunProxy() {
     $ctr_cli restart unbound >> proxy.log 2>&1
 
     $ctr_cli cp $(pwd)/proxy/allowlist proxy:/etc/squid/allowlist >> proxy.log 2>&1
-    $ctr_cli cp $(pwd)/proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
     $ctr_cli restart proxy >> proxy.log 2>&1
 
     PROXY_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" proxy)

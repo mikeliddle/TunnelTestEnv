@@ -407,7 +407,7 @@ Function Remove-TunnelServers {
     if($Site){
         $servers = Get-MgDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Site.Id
         $servers | ForEach-Object {
-            Write-Host "Deleting '$($_.DisplayName)'..."
+            Write-Header "Deleting '$($_.DisplayName)'..."
             Invoke-MgGraphRequest -Method DELETE -Uri "https://graph.microsoft.com/beta/deviceManagement/microsoftTunnelSites/$($Site.Id)/microsoftTunnelServers/$($_.Id)"
         }
     } else {
@@ -793,7 +793,7 @@ Function New-AndroidTrustedRootPolicy{
             $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----","").Replace("-----END CERTIFICATE-----","") -join ""
             
             $Body = @{
-                "@odata.type" = "#microsoft.graph.androidTrustedRootCertificate"
+                "@odata.type" = "#microsoft.graph.androidWorkProfileTrustedRootCertificate"
                 displayName = $DisplayName
                 id = [System.Guid]::Empty.ToString()
                 roleScopeTagIds = @("0")
