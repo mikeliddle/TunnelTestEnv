@@ -5,6 +5,9 @@
 1. Clone this repo to your local machine.
 2. Ensure powershell is installed on your machine.
 3. Run `./CreateServer.ps1` with the necessary parameters.
+   - Example: ./CreateServer.ps1 -VmName mstunnel-test -BundleIds com.microsoft.scmx -GroupName myusergroup
+   - You will be prompted first to sign-in with an Azure account to create the VM, then twice to authenticate to your Intune tenant for setting up the Tunnel configura
+tion and profiles.
 4. Clean up the environment by running `./CreateServer.ps1 -Delete`
 
 ### Powershell arguments
@@ -28,6 +31,7 @@ Optional Parameters:
 - `-VMTenantCredential`: a pscredential object used for silent authentication to the VM subscription. Default is to prompt for credentials.
 - `-TenantCredential`: a pscredential object used for silent authentication to the tunnel tenant. Default is to prompt for credentials.
 - `-SubscriptionId`: The subscription ID to use for the VM. Default is to detect this from the VM login information.
+- `-PACUrl`: The url for the Proxy Automatic Configuration script. Default is the one setup and hosted on the nginx web server container.
 
 Switches:
 
