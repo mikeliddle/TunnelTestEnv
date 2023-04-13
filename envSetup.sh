@@ -304,7 +304,7 @@ ConfigureNginx() {
 BuildAndRunProxy() {
     LogInfo "Setting up squid proxy container"
 
-    PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_tamplate)
+    PROXY_BYPASS_NAME_TEMPLATE=$(cat proxy/proxy_bypass_name_template)
     UNBOUND_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" unbound)
 
     sed -i -e "s/\bPROXY_HOST_NAME\b/proxy.$DOMAIN_NAME/g" nginx_data/tunnel.pac
@@ -312,8 +312,13 @@ BuildAndRunProxy() {
 
     for pan in "${PROXY_BYPASS_NAMES[@]}"; do
         LogInfo "Proxy bypass name: $pan"
-        panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/\bPROXY_BYPASS_NAME\b/$pan/g")
+        panline=$(echo $PROXY_BYPASS_NAME_TEMPLATE | sed -e "s/PROXY_BYPASS_NAME/$pan/")
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
+    done
+
+    for name in "${PROXY_ALLOWED_NAMES[@]}"; do
+        LogInfo "Proxy allowed name: $name"
+        echo $name >> proxy/allowlist
     done
 
     $ctr_cli run -d \
@@ -336,7 +341,7 @@ BuildAndRunProxy() {
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
 
-    $ctr_cli cp $(pwd)/proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
+    $ctr_cli cp $(pwd)/proxy/allowlist proxy:/etc/squid/allowlist >> proxy.log 2>&1
     $ctr_cli restart proxy >> proxy.log 2>&1
 
     PROXY_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" proxy)
