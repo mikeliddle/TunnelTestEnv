@@ -316,6 +316,11 @@ BuildAndRunProxy() {
         sed -i -e "s#// PROXY_BYPASS_NAMES#$panline#g" nginx_data/tunnel.pac;
     done
 
+    for name in "${PROXY_ALLOWED_NAMES[@]}"; do
+        LogInfo "Proxy allowed name: $name"
+        echo $name >> proxy/allowlist
+    done
+
     $ctr_cli run -d \
             --name proxy \
             -p 3128 \
@@ -336,6 +341,7 @@ BuildAndRunProxy() {
     $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> proxy.log 2>&1
 
+    $ctr_cli cp $(pwd)/proxy/allowlist proxy:/etc/squid/allowlist >> proxy.log 2>&1
     $ctr_cli cp $(pwd)/proxy/squid.conf proxy:/etc/squid/squid.conf >> proxy.log 2>&1
     $ctr_cli restart proxy >> proxy.log 2>&1
 
