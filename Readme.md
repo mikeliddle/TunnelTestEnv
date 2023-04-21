@@ -22,7 +22,7 @@ Optional Parameters:
 
 - `-Platform`: mobile platforms to create profiles for. Default is "all", valid options are `ios, android, all`.
 - `-Location`: The azure region to create the VM in. Default is `westus`.
-- `-Size`: The size of the VM to create. Default is `Standard_B1s`.
+- `-Size`: The size of the VM to create. Default is `Standard_B2s`.
 - `-Image`: The image to use for the VM. Default is `Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest`.
 - `-Environment`: The Intune cloud environment to use. Default is `PE`.
 - `-Email`: The email address to use for the Let's Encrypt certificate. Default is to detect this from the VM login information.

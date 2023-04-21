@@ -34,7 +34,7 @@ param(
     [string]$Username="azureuser",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [string]$Size = "Standard_B1s",
+    [string]$Size = "Standard_B2s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
@@ -79,7 +79,15 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string]$PACUrl
+    [string]$PACUrl,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [string[]]$IncludeRoutes,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [string[]]$ExcludeRoutes
 )
 
 $script:Account = $null
@@ -367,7 +375,7 @@ Function New-TunnelConfiguration {
         $ListenPort = 443
         $DnsServers = @("8.8.8.8")
         $Network = "169.254.0.0/16"
-        $script:ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $VmName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Network -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes @() -RouteIncludes @() -SplitDns @()    
+        $script:ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $VmName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Network -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes $ExcludeRoutes -RouteIncludes $IncludeRoutes -SplitDns @()    
     }
 }
 
