@@ -83,11 +83,11 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string[]]$IncludeRoutes,
+    [string[]]$IncludeRoutes=@(),
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string[]]$ExcludeRoutes
+    [string[]]$ExcludeRoutes=@()
 )
 
 $script:Account = $null
