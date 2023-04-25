@@ -584,6 +584,13 @@ DetectEnvironment() {
         update_command="apt-get update"
         ctr_package_name="docker.io"
         network_name="bridge"
+    elif [ -f "/etc/centos-release"]; then
+        # centos
+        ctr_cli="docker"
+        installer="yum"
+        update_command="yum -y update"
+        ctr_package_name="docker.io"
+        network_name="bridge"
     else
         # RHEL
         ctr_cli="podman"

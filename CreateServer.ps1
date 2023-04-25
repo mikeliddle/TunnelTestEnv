@@ -137,7 +137,7 @@ Function Login {
         Write-Header "Logging into Azure..."
         if (-Not $VmTenantCredential) {
             Write-Header "Select the account to manage the VM."
-            az login --only-show-errors | Out-Null
+            az login --allow-no-subscriptions --only-show-errors | Out-Null
         } else {
             az login -u $VmTenantCredential.UserName -p $VmTenantCredential.GetNetworkCredential().Password --only-show-errors | Out-Null
         }
@@ -239,7 +239,7 @@ Function Remove-ResourceGroup {
 
 Function New-VM {
     Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username | ConvertFrom-Json
     $script:FQDN = $vmdata.fqdns
     Write-Host "DNS is '$FQDN'"
 }
@@ -281,16 +281,16 @@ Function Initialize-SetupScript {
         Write-Header "Generating setup script..."
         $ServerName = $FQDN.Split('.')[0]
         $GitBranch = git branch --show-current
+        if ($Image -imatch "RHEL"){
+            $Installer = "dnf"
+        } elseif ($Image -imatch "centos") {
+            $Installer = "yum"
+        } else {
+            $Installer = "apt-get"
+        }
         $Content = @"
         export intune_env=$Environment;
-
-        if [ -f "/etc/debian_version" ]; then
-            # debian
-            installer="apt-get"
-        else
-            # RHEL
-            installer="dnf"
-        fi
+        installer="$Installer"
 
         `$installer install -y git >> install.log 2>&1
 
@@ -600,7 +600,7 @@ Function New-IosTrustedRootPolicy {
             $script:IosTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
             # re-fetch the policy so the root certificate is included
             $script:IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
-            
+            $script:IosTrustedRootPolicy
             $Body = @{
                 "assignments" = @(@{
                     "target" = @{
