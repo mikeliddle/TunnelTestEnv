@@ -4,7 +4,7 @@
 if [ -f "/etc/debian_version" ]; then
     # debian
     installer="apt-get"
-elif [ -f "/etc/centos-release"]; then
+elif [ -f "/etc/centos-release" ]; then
     # centos
     installer="yum"
 else

@@ -37,7 +37,7 @@ param(
     [string]$Size = "Standard_B1s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
+    [string]$Image = "cognosys:docker-ce-with-centos-7-7-free:docker-ce-with-centos-7-7-free:latest", #"cognosys:centos-8-1-free:centos-8-1-free:latest", #"Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
     
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
