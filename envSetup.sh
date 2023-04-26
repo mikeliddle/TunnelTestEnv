@@ -15,7 +15,7 @@ LogWarning() {
 InstallPrereqs() {
     LogInfo "installing container runtime"
     $update_command >> install.log 2>&1
-    $installer install -y $ctr_package_name >> install.log 2>&1
+    $install_ctr_command >> install.log 2>&1
     $installer install -y jq >> install.log 2>&1
 
     $ctr_cli --version > /dev/null 2>&1
@@ -584,6 +584,7 @@ DetectEnvironment() {
         update_command="apt-get update"
         ctr_package_name="docker.io"
         network_name="bridge"
+        install_ctr_command="$installer install -y $ctr_package_name"
     elif [ -f "/etc/centos-release" ]; then
         # centos
         ctr_cli="docker"
@@ -591,6 +592,7 @@ DetectEnvironment() {
         update_command="yum -y update"
         ctr_package_name="docker.io"
         network_name="bridge"
+        install_ctr_command="curl -fsSL https://get.docker.com -o get-docker.sh; sh get-docker.sh"
     else
         # RHEL
         ctr_cli="podman"
@@ -598,6 +600,7 @@ DetectEnvironment() {
         update_command="dnf -y update"
         ctr_package_name="@container-tools"
         network_name="podman"
+        install_ctr_command="$installer install -y $ctr_package_name"
         # open up port 443
         firewall-cmd --zone=public --add-port=443/tcp
         firewall-cmd --zone=public --add-port=443/udp
