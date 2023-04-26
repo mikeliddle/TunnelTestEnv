@@ -20,6 +20,7 @@ InstallPrereqs() {
     curl -fsSL https://get.docker.com -o get-docker.sh
     LogInfo "running 'sh get-docker.sh'"
     sh get-docker.sh
+    service docker start
     #$install_ctr_command >> install.log 2>&1
     $installer install -y jq >> install.log 2>&1
 
