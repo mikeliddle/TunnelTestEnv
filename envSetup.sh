@@ -14,7 +14,9 @@ LogWarning() {
 
 InstallPrereqs() {
     LogInfo "installing container runtime"
+    LogInfo "running '$update_command'"
     $update_command >> install.log 2>&1
+    LogInfo "running '$install_ctr_command'"
     $install_ctr_command >> install.log 2>&1
     $installer install -y jq >> install.log 2>&1
 
