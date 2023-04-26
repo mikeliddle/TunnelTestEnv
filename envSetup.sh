@@ -30,6 +30,9 @@ InstallPrereqs() {
         exit 1
     fi
 
+    yum makecache
+    yum -y install systemd-resolved
+
     LogInfo "disabling resolved.service"
     sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
     sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
