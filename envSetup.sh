@@ -16,8 +16,11 @@ InstallPrereqs() {
     LogInfo "installing container runtime"
     LogInfo "running '$update_command'"
     $update_command >> install.log 2>&1
-    LogInfo "running '$install_ctr_command'"
-    $install_ctr_command >> install.log 2>&1
+    LogInfo "running 'curl -fsSL https://get.docker.com -o get-docker.sh'"
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    LogInfo "running 'sh get-docker.sh'"
+    sh get-docker.sh
+    #$install_ctr_command >> install.log 2>&1
     $installer install -y jq >> install.log 2>&1
 
     $ctr_cli --version > /dev/null 2>&1
