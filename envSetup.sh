@@ -181,10 +181,14 @@ ConfigureCerts() {
         exit 1
     fi
 
+    openssl genrsa -out private/intermediatekey.pem 4096 >> certs.log 2>&1
+    openssl req -new -key private/intermediatekey.pem -out req/intermediate.csr -config intermediate.conf >> certs.log 2>&1
+    openssl ca -in req/intermediate.csr -out certs/intermediate.pem -config intermediate.conf >> certs.log 2>&1
+
     # generate leaf from our CA
     openssl genrsa -out private/server.key 4096 >> certs.log 2>&1
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
-    openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+    openssl x509 -req -days 365 -in req/server.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
     openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -passout pass: >> certs.log 2>&1
 
@@ -196,7 +200,7 @@ ConfigureCerts() {
     # generate user cert from our CA
     openssl genrsa -out private/user.key 4096 >> certs.log 2>&1
     openssl req -new -key private/user.key -out req/user.csr -config user.conf >> certs.log 2>&1
-    openssl x509 -req -days 365 -in req/user.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+    openssl x509 -req -days 365 -in req/user.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/user.pem -extensions req_ext -extfile user.conf >> certs.log 2>&1
     openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass: >> certs.log 2>&1
 
