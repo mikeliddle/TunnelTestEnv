@@ -185,7 +185,7 @@ ConfigureCerts() {
 
     openssl genrsa -out private/intermediatekey.pem 4096 >> certs.log 2>&1
     openssl req -new -key private/intermediatekey.pem -out req/intermediate.csr -config intermediate.conf >> certs.log 2>&1
-    openssl ca -in req/intermediate.csr -out certs/intermediate.pem -config intermediate.conf >> certs.log 2>&1
+    openssl ca -in req/intermediate.csr -out certs/intermediate.pem -config intermediate.conf -batch >> certs.log 2>&1
 
     # generate leaf from our CA
     openssl genrsa -out private/server.key 4096 >> certs.log 2>&1
