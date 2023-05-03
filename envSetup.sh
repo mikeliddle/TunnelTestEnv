@@ -159,6 +159,8 @@ ConfigureCerts() {
     mkdir -p /etc/pki/tls/certs
     mkdir -p /etc/pki/tls/req
     mkdir -p /etc/pki/tls/private
+
+    touch /etc/pki/tls/index.txt
     
     if [ $? -ne 0 ]; then
         LogError "Failed to setup pki directory structure"
