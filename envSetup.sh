@@ -193,6 +193,8 @@ ConfigureCerts() {
     openssl x509 -req -days 365 -in req/server.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
     openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -passout pass: >> certs.log 2>&1
+    cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
+    cat certs/server.pem certs/cacert.pem certs/intermediate-trimmed.pem > certs/serverchain.pem
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
@@ -475,15 +477,12 @@ SetupTunnelPrereqs() {
 SetupEnterpriseCerts() {
     # put the certs in place
     # no need using a different server cert, just need to reformat it.
-    cp /etc/pki/tls/certs/server.pem /etc/pki/tls/certs/tunnel.pem
+    cp /etc/pki/tls/certs/serverchain.pem /etc/pki/tls/certs/tunnel.pem
     
     if [ $? -ne 0 ]; then
         LogError "Failed to setup leaf cert"
         exit 1
     fi
-
-    cat /etc/pki/tls/certs/cacert.pem >> /etc/pki/tls/certs/tunnel.pem
-    cat /etc/pki/tls/certs/intermediate.pem >> /etc/pki/tls/certs/tunnel.pem
 
     cp /etc/pki/tls/certs/tunnel.pem /etc/mstunnel/certs/site.crt    
     cp /etc/pki/tls/private/server.key /etc/mstunnel/private/site.key
