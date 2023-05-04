@@ -159,6 +159,8 @@ ConfigureCerts() {
     mkdir -p /etc/pki/tls/certs
     mkdir -p /etc/pki/tls/req
     mkdir -p /etc/pki/tls/private
+
+    touch /etc/pki/tls/index.txt
     
     if [ $? -ne 0 ]; then
         LogError "Failed to setup pki directory structure"
@@ -181,12 +183,19 @@ ConfigureCerts() {
         exit 1
     fi
 
+    openssl genrsa -out private/intermediatekey.pem 4096 >> certs.log 2>&1
+    openssl req -new -key private/intermediatekey.pem -out req/intermediate.csr -config intermediate.conf >> certs.log 2>&1
+    openssl ca -in req/intermediate.csr -out certs/intermediate.pem -config intermediate.conf -batch >> certs.log 2>&1
+
     # generate leaf from our CA
     openssl genrsa -out private/server.key 4096 >> certs.log 2>&1
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
-    openssl x509 -req -days 365 -in req/server.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+    openssl x509 -req -days 365 -in req/server.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
-    openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -passout pass: >> certs.log 2>&1
+    openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -certfile certs/serverchain.pem -passout pass: >> certs.log 2>&1
+    
+    cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
+    cat certs/server.pem certs/cacert.pem certs/intermediate-trimmed.pem > certs/serverchain.pem
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
@@ -196,7 +205,7 @@ ConfigureCerts() {
     # generate user cert from our CA
     openssl genrsa -out private/user.key 4096 >> certs.log 2>&1
     openssl req -new -key private/user.key -out req/user.csr -config user.conf >> certs.log 2>&1
-    openssl x509 -req -days 365 -in req/user.csr -CA certs/cacert.pem -CAkey private/cakey.pem \
+    openssl x509 -req -days 365 -in req/user.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/user.pem -extensions req_ext -extfile user.conf >> certs.log 2>&1
     openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass: >> certs.log 2>&1
 
@@ -469,14 +478,12 @@ SetupTunnelPrereqs() {
 SetupEnterpriseCerts() {
     # put the certs in place
     # no need using a different server cert, just need to reformat it.
-    cp /etc/pki/tls/certs/server.pem /etc/pki/tls/certs/tunnel.pem
+    cp /etc/pki/tls/certs/serverchain.pem /etc/pki/tls/certs/tunnel.pem
     
     if [ $? -ne 0 ]; then
         LogError "Failed to setup leaf cert"
         exit 1
     fi
-
-    cat /etc/pki/tls/certs/cacert.pem >> /etc/pki/tls/certs/tunnel.pem
 
     cp /etc/pki/tls/certs/tunnel.pem /etc/mstunnel/certs/site.crt    
     cp /etc/pki/tls/private/server.key /etc/mstunnel/private/site.key
