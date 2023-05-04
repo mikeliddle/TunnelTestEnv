@@ -192,7 +192,8 @@ ConfigureCerts() {
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/server.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
-    openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -passout pass: >> certs.log 2>&1
+    openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -certfile certs/serverchain.pem -passout pass: >> certs.log 2>&1
+    
     cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
     cat certs/server.pem certs/cacert.pem certs/intermediate-trimmed.pem > certs/serverchain.pem
 
