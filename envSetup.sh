@@ -483,6 +483,7 @@ SetupEnterpriseCerts() {
     fi
 
     cat /etc/pki/tls/certs/cacert.pem >> /etc/pki/tls/certs/tunnel.pem
+    cat /etc/pki/tls/certs/intermediate.pem >> /etc/pki/tls/certs/tunnel.pem
 
     cp /etc/pki/tls/certs/tunnel.pem /etc/mstunnel/certs/site.crt    
     cp /etc/pki/tls/private/server.key /etc/mstunnel/private/site.key
