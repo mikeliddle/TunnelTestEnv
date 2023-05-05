@@ -506,6 +506,29 @@ Function New-TunnelAgent{
     }
 }
 
+Function Update-PrivateDNSAddress {
+    Write-Header "Updating server configuration private DNS..."
+    if ($Image.Contains("RHEL"))
+    {
+        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
+    }
+    else
+    {
+        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
+    }
+    $newServers = $DNSPrivateAddress #+ $ServerConfiguration.DnsServers
+    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+}
+
+Function New-TunnelAgent{
+    if (-Not $TenantCredential) {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
+    } else {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+    }
+}
+
 Function New-TunnelSite {
     Write-Header "Creating Site..."
     $script:Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$VmName'" -Limit 1
@@ -1233,41 +1256,26 @@ Function Remove-AndroidAppConfigurationPolicy{
     }
 }
 
-Function New-TunnelAgent{
-    if (-Not $TenantCredential) {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
-    } else {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+Function New-IOSProfiles{
+    if ($Platform -eq "ios" -or $Platform -eq "all") {
+        New-IosTrustedRootPolicy
+        New-IosDeviceConfigurationPolicy
+        New-IosAppProtectionPolicy
+        New-IosAppConfigurationPolicy
     }
 }
 
-Function New-RandomPassword {
-    # Define the character sets to use for the password
-    $lowercaseLetters = "abcdefghijklmnopqrstuvwxyz"
-    $uppercaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    $numbers = "0123456789"
-    $specialCharacters = "!@#$%&*()_+-=[]{};:,./<>?"
-
-    # Combine the character sets into a single string
-    $validCharacters = $lowercaseLetters + $uppercaseLetters + $numbers + $specialCharacters
-
-    # Define the length of the password
-    $passwordLength = 16
-
-    # Generate the password
-    $password = ""
-    for ($i = 0; $i -lt $passwordLength; $i++) {
-        # Get a random index into the valid characters string
-        $randomIndex = Get-Random -Minimum 0 -Maximum $validCharacters.Length
-
-        # Add the character at the random index to the password
-        $password += $validCharacters[$randomIndex]
+Function New-AndroidProfiles{
+    if ($Platform -eq "android" -or $Platform -eq "all") {
+        New-AndroidTrustedRootPolicy
+        New-AndroidDeviceConfigurationPolicy
+        New-AndroidAppProtectionPolicy
+        New-AndroidAppConfigurationPolicy
     }
-
-    # Output the password
-    return $password
 }
+#endregion Profile Functions
 
+#region ADFS Functions
 Function New-ADFSEnvironment {
     Write-Header "Creating ADFS Environment"
 

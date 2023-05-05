@@ -2,4 +2,8 @@
 .ipchicken.com
 .whatismyipaddress.com
 .bing.com
+<<<<<<< HEAD
 .ifconfig.me
+=======
+.ifconfig.me
+>>>>>>> 28c56ca (moved proxy configuration to use separate VM)
