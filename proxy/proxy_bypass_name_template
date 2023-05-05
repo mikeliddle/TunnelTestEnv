@@ -1,1 +1,0 @@
-if (shExpMatch(host, "PROXY_BYPASS_NAME")) { return bypass; } // PROXY_BYPASS_NAMES
