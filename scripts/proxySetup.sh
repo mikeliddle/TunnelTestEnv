@@ -32,8 +32,8 @@ Uninstall() {
 }
 
 ConfigureSquid() {
-    cp ./squid.conf /etc/squid/squid.conf
-    cp ./allowlist /etc/squid/allowlist
+    cp ./squid.conf.tmp /etc/squid/squid.conf
+    cp ./allowlist.tmp /etc/squid/allowlist
     
     if [ $? -ne 0 ]; then
         LogError "Failed to configure Squid."

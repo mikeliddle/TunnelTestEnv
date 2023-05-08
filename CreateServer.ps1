@@ -332,7 +332,7 @@ Function Remove-SSHKeys{
 #region Proxy Functions
 Function New-ProxyVM {
     Write-Header "Creating VM '$VmName-squid'..."
-    $script:ProxyVMData = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-squid" --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $script:ProxyVMData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-squid" --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-squid" --admin-username $Username --only-show-errors | ConvertFrom-Json
 }
 
 Function Initialize-Proxy {
@@ -361,7 +361,7 @@ Function Initialize-Proxy {
 
     scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
     scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$proxyScript.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
     scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$pacFile.tmp" "$($username)@$("$FQDN"):~/" > $null
 
@@ -1269,12 +1269,11 @@ Function New-TunnelEnvironment {
     Initialize-Variables
     New-SSHKeys
     New-ResourceGroup
+    New-TunnelVM
     
     New-ProxyVM
     Initialize-Proxy
     Invoke-ProxyScript
-
-    New-TunnelVM
     
     New-NetworkRules
 
