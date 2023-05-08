@@ -1406,6 +1406,7 @@ if ($ProfilesOnly) {
     Remove-TunnelEnvironment
 } elseif ($WithADFS) {
     New-ADFSEnvironment
+    New-TunnelEnvironment
 } else {
     New-TunnelEnvironment
 }
