@@ -11,4 +11,4 @@ Generated.xcconfig
 bin
 obj
 
-.tmp
+*.tmp
