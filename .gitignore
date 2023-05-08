@@ -2,7 +2,7 @@
 .DS_Store
 
 # Script artifacts
-*.log
+.log
 agent.p12
 agent-info.json
 Generated.xcconfig

@@ -73,6 +73,9 @@ Uninstall() {
 
 ConfigureSquid() {
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 58a02f7 (more proxy troubleshooting)
     cp ./squid.conf.tmp /etc/squid/squid.conf
     cp ./allowlist.tmp /etc/squid/allowlist
     
