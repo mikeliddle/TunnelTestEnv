@@ -341,12 +341,12 @@ Function Initialize-Proxy {
     $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
     $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
 
-    (Get-Content $configFile) -replace "##DOMAIN_NAME##","$FQDN" | out-file $configFile
-    (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##","$FQDN" | out-file $allowlistFile
+    (Get-Content $configFile) -replace "##DOMAIN_NAME##","$FQDN" | out-file "$configFile.tmp"
+    (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##","$FQDN" | out-file "$allowlistFile.tmp"
 
     $proxyBypassNames = ("www.google.com", "excluded.$($FQDN)")
     foreach ($name in $proxyBypassNames) {
-        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES","`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file $pacFile
+        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES","`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile.tmp"
     }
 
     # Replace CR+LF with LF
@@ -357,20 +357,21 @@ Function Initialize-Proxy {
     $text = [IO.File]::ReadAllText($proxyScript) -replace "`r", "`n"
     [IO.File]::WriteAllText($proxyScript, $text)
 
-    Write-Header "Copying setup script to remote server..."
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" $configFile "$($username)@$("$FQDN-squid"):~/" > $null
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" $allowlistFile "$($username)@$("$FQDN-squid"):~/" > $null
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" $proxyScript "$($username)@$("$FQDN-squid"):~/" > $null
+    Write-Header "Copying proxy script to remote server..."
 
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" $pacFile "$($username)@$("$FQDN"):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$proxyScript.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
-    Write-Header "Marking setup scripts as executable..."
-    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "chmod +x ~/proxySetup.sh"
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$pacFile.tmp" "$($username)@$("$FQDN"):~/" > $null
+
+    Write-Header "Marking proxy scripts as executable..."
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
 }
 
 Function Invoke-ProxyScript {
     Write-Header "Connecting into remote server..."
-    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$("$FQDN-squid")" "sudo su -c './proxySetup.sh'"
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
 }
 #endregion Proxy Functions
 

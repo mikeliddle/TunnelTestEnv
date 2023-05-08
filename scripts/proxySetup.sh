@@ -14,20 +14,32 @@ LogWarning() {
 
 InstallPrereqs() {
     LogInfo "Installing prerequisites..."
-    sudo apt-get update
-    sudo apt-get install -y squid
+    sudo apt-get -y update >> install.log 2>&1
+    sudo apt-get install -y squid >> install.log 2>&1
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to install prerequisites."
+        exit 1
+    fi
+    
     LogInfo "Prerequisites installed."
 }
 
 Uninstall() {
     LogInfo "Uninstalling..."
-    sudo apt-get remove -y squid
+    sudo apt-get remove -y squid >> install.log 2>&1
     LogInfo "Uninstalled."
 }
 
 ConfigureSquid() {
     cp ./squid.conf /etc/squid/squid.conf
     cp ./allowlist /etc/squid/allowlist
+    
+    if [ $? -ne 0 ]; then
+        LogError "Failed to configure Squid."
+        exit 1
+    fi
+
     sudo systemctl restart squid
     LogInfo "Squid configured."
 }
