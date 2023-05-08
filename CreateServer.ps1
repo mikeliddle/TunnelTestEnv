@@ -399,19 +399,19 @@ Function Initialize-SetupScript {
 
         cp ../agent.p12 .
         cp ../agent-info.json .
-        cp ../tunnel.pac nginx_data/tunnel.pac
+        cp ../tunnel.pac.tmp nginx_data/tunnel.pac
 
         git submodule update --init >> install.log 2>&1
 
-        chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
+        chmod +x scripts/*
         
         PUBLIC_IP=`$(curl ifconfig.me)
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         export SETUP_ARGS="-i$(if ($UseEnterpriseCa) {"e"})"
         
-        ./setup-expect.sh
+        ./scripts/setup-expect.sh
         
-        expect -f ./setup.exp
+        expect -f ./scripts/setup.exp
 "@
 
         $file = Join-Path $pwd -ChildPath "Setup.sh"
