@@ -1328,12 +1328,11 @@ Function New-TunnelEnvironment {
     Initialize-Variables
     New-SSHKeys
     New-ResourceGroup
+    New-TunnelVM
     
     New-ProxyVM
     Initialize-Proxy
     Invoke-ProxyScript
-
-    New-TunnelVM
     
     if ($NoProxy) {
         Write-Host "Skipping proxy VM creation..."
