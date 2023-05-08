@@ -2,7 +2,7 @@
 .DS_Store
 
 # Script artifacts
-.log
+*.log
 agent.p12
 agent-info.json
 Generated.xcconfig
@@ -11,8 +11,4 @@ Generated.xcconfig
 bin
 obj
 
-<<<<<<< HEAD
 *.tmp
-=======
-.tmp
->>>>>>> 58a02f7 (more proxy troubleshooting)
