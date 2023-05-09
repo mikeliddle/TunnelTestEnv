@@ -114,6 +114,7 @@ $script:AndroidTrustedRootPolicy = $null
 $script:RunningOS = ""
 $script:PACUrl = ""
 $script:ProxyVMData = $null
+$script:ProxyIP = ""
 
 #region Helper Functions
 Function Write-Header([string]$Message) {
@@ -333,6 +334,7 @@ Function Remove-SSHKeys{
 Function New-ProxyVM {
     Write-Header "Creating VM '$VmName-squid'..."
     $script:ProxyVMData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-squid" --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-squid" --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $script:ProxyIP = az vm list-ip-addresses --resource-group "$VmName-group" --name "$VmName-squid" --query '[0].virtualMachine.network.privateIpAddresses[0]' | ConvertFrom-Json
 }
 
 Function Initialize-Proxy {
@@ -406,6 +408,7 @@ Function Initialize-SetupScript {
         chmod +x scripts/*
         
         PUBLIC_IP=`$(curl ifconfig.me)
+        sed -i.bak -e "s/##PROXY_IP##/$ProxyIP/" unbound.conf.d/a-records.conf
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         export SETUP_ARGS="-i$(if ($UseEnterpriseCa) {"e"})"
         
