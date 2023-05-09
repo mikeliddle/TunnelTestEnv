@@ -26,6 +26,7 @@ InstallPrereqs() {
             LogError "Failed to install prerequisites."
             installSucceeded=1
             retryCount=$((retryCount+1))
+            sleep 5
         else
             installSucceeded=0
             break
