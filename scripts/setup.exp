@@ -11,7 +11,7 @@ if {$force_conservative} {
 }
 
 set timeout -1
-spawn ./envSetup.sh ##ARGS##
+spawn ./scripts/envSetup.sh ##ARGS##
 match_max 100000
 expect -exact "Enter Site ID to join : "
 send -- "##SITE_ID##"

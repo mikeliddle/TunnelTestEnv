@@ -37,6 +37,9 @@ param(
     [string]$Size = "Standard_B2s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [string]$ProxySize = "Standard_B2s",
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
     
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -110,13 +113,48 @@ $script:IosTrustedRootPolicy = $null
 $script:AndroidTrustedRootPolicy = $null
 $script:RunningOS = ""
 $script:PACUrl = ""
+$script:ProxyVMData = $null
+$script:ProxyIP = ""
 
+#region Helper Functions
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
 }
 
 Function Write-Success([string]$Message) {
     Write-Host $Message -ForegroundColor Green
+}
+
+Function New-SSHKeys{
+    Write-Header "Generating new RSA 4096 SSH Key"
+    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
+}
+
+Function New-RandomPassword {
+    # Define the character sets to use for the password
+    $lowercaseLetters = "abcdefghijklmnopqrstuvwxyz"
+    $uppercaseLetters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    $numbers = "0123456789"
+    $specialCharacters = "!@#$%&*()_+-=[]{};:,./<>?"
+
+    # Combine the character sets into a single string
+    $validCharacters = $lowercaseLetters + $uppercaseLetters + $numbers + $specialCharacters
+
+    # Define the length of the password
+    $passwordLength = 16
+
+    # Generate the password
+    $password = ""
+    for ($i = 0; $i -lt $passwordLength; $i++) {
+        # Get a random index into the valid characters string
+        $randomIndex = Get-Random -Minimum 0 -Maximum $validCharacters.Length
+
+        # Add the character at the random index to the password
+        $password += $validCharacters[$randomIndex]
+    }
+
+    # Output the password
+    return $password
 }
 
 Function Test-Prerequisites {
@@ -129,6 +167,11 @@ Function Test-Prerequisites {
     if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph")) {
         Write-Header "Installing Microsoft.Graph..."
         Install-Module Microsoft.Graph -Force
+    }
+
+    if (-Not ($PSVersionTable.PSVersion.Major -ge 6)) {
+        Write-Error "Please use PowerShell Core 6 or later."
+        Exit 1
     }
 
     if ($IsLinux) {
@@ -223,7 +266,9 @@ Function Initialize-Variables {
         }
     }
 }
+#endregion Helper Functions
 
+#region Azure Functions
 Function New-ResourceGroup {
     Write-Header "Checking for resource group '$resourceGroup'..."
     if ([bool](az group show --name $resourceGroup 2> $null)) {
@@ -245,7 +290,7 @@ Function Remove-ResourceGroup {
     }
 }
 
-Function New-VM {
+Function New-TunnelVM {
     Write-Header "Creating VM '$VmName'..."
     $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
     $script:FQDN = $vmdata.fqdns
@@ -283,7 +328,56 @@ Function Remove-SSHKeys{
         Write-Host "Key at path '~/.ssh/$VmName.pub' does not exist."
     }
 }
+#endregion Azure Functions
 
+#region Proxy Functions
+Function New-ProxyVM {
+    Write-Header "Creating VM '$VmName-squid'..."
+    $script:ProxyVMData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-squid" --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-squid" --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $script:ProxyIP = az vm list-ip-addresses --resource-group "$VmName-group" --name "$VmName-squid" --query '[0].virtualMachine.network.privateIpAddresses[0]' | ConvertFrom-Json
+}
+
+Function Initialize-Proxy {
+    $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
+    $allowlistFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist"
+    $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
+    $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
+
+    (Get-Content $configFile) -replace "##DOMAIN_NAME##","$FQDN" | out-file "$configFile.tmp"
+    (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##","$FQDN" | out-file "$allowlistFile.tmp"
+
+    $proxyBypassNames = ("www.google.com", "excluded.$($FQDN)")
+    foreach ($name in $proxyBypassNames) {
+        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES","`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile.tmp"
+    }
+
+    # Replace CR+LF with LF
+    $text = [IO.File]::ReadAllText($proxyScript) -replace "`r`n", "`n"
+    [IO.File]::WriteAllText($proxyScript, $text)
+
+    # Replace CR with LF
+    $text = [IO.File]::ReadAllText($proxyScript) -replace "`r", "`n"
+    [IO.File]::WriteAllText($proxyScript, $text)
+
+    Write-Header "Copying proxy script to remote server..."
+
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$pacFile.tmp" "$($username)@$("$FQDN"):~/" > $null
+
+    Write-Header "Marking proxy scripts as executable..."
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
+}
+
+Function Invoke-ProxyScript {
+    Write-Header "Connecting into remote server..."
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
+}
+#endregion Proxy Functions
+
+#region Setup Script
 Function Initialize-SetupScript {
     try{
         Write-Header "Generating setup script..."
@@ -307,18 +401,20 @@ Function Initialize-SetupScript {
 
         cp ../agent.p12 .
         cp ../agent-info.json .
+        cp ../tunnel.pac.tmp nginx_data/tunnel.pac
 
         git submodule update --init >> install.log 2>&1
 
-        chmod +x setup.exp envSetup.sh exportCert.sh setup-expect.sh
+        chmod +x scripts/*
         
         PUBLIC_IP=`$(curl ifconfig.me)
-        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" -e "s/PROXY_ALLOWED_NAMES=/PROXY_ALLOWED_NAMES=(.$($FQDN) ".ipchicken.com" ".whatismyipaddress.com" ".bing.com")/" -e "s/PROXY_BYPASS_NAMES=/PROXY_BYPASS_NAMES=(\"www.google.com\" \"excluded.$($FQDN)\")/" vars
-        export SETUP_ARGS="-i$(if (-Not $NoProxy) {"p"})$(if ($UseEnterpriseCa) {"e"})"
+        $(if (-Not $NoProxy) {"sed -i.bak -e 's/##PROXY_IP##/$ProxyIP/' -e's/# local-data/local-data/'  unbound.conf.d/a-records.conf"})
+        sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
+        export SETUP_ARGS="-i$(if ($UseEnterpriseCa) {"e"})"
         
-        ./setup-expect.sh
+        ./scripts/setup-expect.sh
         
-        expect -f ./setup.exp
+        expect -f ./scripts/setup.exp
 "@
 
         $file = Join-Path $pwd -ChildPath "Setup.sh"
@@ -350,22 +446,9 @@ Function Invoke-SetupScript {
     Write-Header "Connecting into remote server..."
     ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo su -c './Setup.sh'"
 }
+#endregion Setup Script
 
-Function Update-PrivateDNSAddress {
-    Write-Header "Updating server configuration private DNS..."
-    if ($Image.Contains("RHEL"))
-    {
-        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
-    }
-    else
-    {
-        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
-    }
-    $newServers = $DNSPrivateAddress #+ $ServerConfiguration.DnsServers
-    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
-    $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
-}
-
+#region Tunnel Components
 Function New-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
     $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$VmName'" -Limit 1
@@ -386,6 +469,29 @@ Function Remove-TunnelConfiguration {
         Remove-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
     } else {
         Write-Host "Server Configuration '$VmName' does not exist."
+    }
+}
+
+Function Update-PrivateDNSAddress {
+    Write-Header "Updating server configuration private DNS..."
+    if ($Image.Contains("RHEL"))
+    {
+        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
+    }
+    else
+    {
+        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
+    }
+    $newServers = $DNSPrivateAddress #+ $ServerConfiguration.DnsServers
+    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    $script:ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+}
+
+Function New-TunnelAgent{
+    if (-Not $TenantCredential) {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
+    } else {
+        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
     }
 }
 
@@ -423,6 +529,9 @@ Function Remove-TunnelServers {
     }
 }
 
+#endregion Tunnel Components
+
+#region iOS MAM Specific Functions
 Function Update-ADApplication {
     $script:App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
     if($App) {
@@ -526,7 +635,9 @@ CONFIGURED_CLIENT_ID = $($App.AppId)
 "@
     Set-Content -Path "./Generated.xcconfig" -Value $Content -Force
 }
+#endregion iOS MAM Specific Functions
 
+#region Profile Functions
 Function New-IosAppProtectionPolicy{
     $DisplayName = "ios-$VmName-Protection"
     $script:IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
@@ -1111,19 +1222,6 @@ Function Remove-AndroidAppConfigurationPolicy{
     }
 }
 
-Function New-TunnelAgent{
-    if (-Not $TenantCredential) {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
-    } else {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
-    }
-}
-
-Function New-SSHKeys{
-    Write-Header "Generating new RSA 4096 SSH Key"
-    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
-}
-
 Function New-IOSProfiles{
     if ($Platform -eq "ios" -or $Platform -eq "all") {
         New-IosTrustedRootPolicy
@@ -1141,14 +1239,26 @@ Function New-AndroidProfiles{
         New-AndroidAppConfigurationPolicy
     }
 }
+#endregion Profile Functions
 
+#region Main Functions
 Function New-TunnelEnvironment {
     Test-Prerequisites
     Login
     Initialize-Variables
     New-SSHKeys
     New-ResourceGroup
-    New-VM
+    New-TunnelVM
+    
+    if ($NoProxy) {
+        Write-Host "Skipping proxy VM creation..."
+        $script:ProxyIP = ""
+    } else {
+        New-ProxyVM
+        Initialize-Proxy
+        Invoke-ProxyScript
+    }
+    
     New-NetworkRules
 
     New-TunnelConfiguration
@@ -1193,7 +1303,6 @@ Function Remove-TunnelEnvironment {
     Logout
 }
 
-
 Function New-ProfilesOnlyEnvironment {
     Test-Prerequisites
     Login
@@ -1218,3 +1327,4 @@ if ($ProfilesOnly) {
 } else {
     New-TunnelEnvironment
 }
+#endregion Main Functions

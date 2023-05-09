@@ -103,7 +103,7 @@ Uninstall() {
 
     git reset --hard
     git pull --recurse-submodules # Needed to reset acme.sh
-    chmod +x envSetup.sh exportCert.sh 
+    chmod +x scripts/envSetup.sh scripts/exportCert.sh 
 }
 
 VerifyEnvironmentVars() {
@@ -653,7 +653,7 @@ SetupTunnelPrereqs
 
 if [[ !$SKIP_CERT_GENERATION ]]; then
     ConfigureCerts
-    ./exportCert.sh  >> certs.log 2>&1
+    ./scripts/exportCert.sh  >> certs.log 2>&1
 fi
 
 if [[ $ENTERPRISE_CA ]]; then
