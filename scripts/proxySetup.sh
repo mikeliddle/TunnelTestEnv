@@ -16,15 +16,18 @@ InstallPrereqs() {
     LogInfo "Installing prerequisites..."
     maxRetries=3
     retryCount=0
+    installSucceeded=1
     sudo apt-get -y update >> install.log 2>&1
 
-    while [ $? -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
+    while [ installSucceeded -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
         sudo apt-get install -y squid >> install.log 2>&1
         
         if [ $? -ne 0 ]; then
             LogError "Failed to install prerequisites."
+            installSucceeded=1
             retryCount=$((retryCount+1))
         else
+            installSucceeded=0
             break
         fi
     done
