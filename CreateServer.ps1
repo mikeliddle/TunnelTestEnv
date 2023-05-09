@@ -96,10 +96,7 @@ param(
     [switch]$WithADFS,
 
     [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
-    [string]$DomainName,
-
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string]$PACUrl
+    [string]$DomainName
 )
 
 $script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
@@ -1296,30 +1293,7 @@ Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object
 Install-WindowsFeature ADFS-Federation
 '@
 }
-
-Function New-SSHKeys{
-    Write-Header "Generating new RSA 4096 SSH Key"
-    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
-}
-
-Function New-IOSProfiles{
-    if ($Platform -eq "ios" -or $Platform -eq "all") {
-        New-IosTrustedRootPolicy
-        New-IosDeviceConfigurationPolicy
-        New-IosAppProtectionPolicy
-        New-IosAppConfigurationPolicy
-    }
-}
-
-Function New-AndroidProfiles{
-    if ($Platform -eq "android" -or $Platform -eq "all") {
-        New-AndroidTrustedRootPolicy
-        New-AndroidDeviceConfigurationPolicy
-        New-AndroidAppProtectionPolicy
-        New-AndroidAppConfigurationPolicy
-    }
-}
-#endregion Profile Functions
+#endregion ADFS Functions
 
 #region Main Functions
 Function New-TunnelEnvironment {
