@@ -408,7 +408,7 @@ Function Initialize-SetupScript {
         chmod +x scripts/*
         
         PUBLIC_IP=`$(curl ifconfig.me)
-        sed -i.bak -e "s/##PROXY_IP##/$ProxyIP/" unbound.conf.d/a-records.conf
+        $(if (-Not $NoProxy) {"sed -i.bak -e 's/##PROXY_IP##/$ProxyIP/' -e's/# local-data/local-data/'  unbound.conf.d/a-records.conf"})
         sed -i.bak -e "s/SERVER_NAME=/SERVER_NAME=$ServerName/" -e "s/DOMAIN_NAME=/DOMAIN_NAME=$FQDN/" -e "s/SERVER_PUBLIC_IP=/SERVER_PUBLIC_IP=`$PUBLIC_IP/" -e "s/EMAIL=/EMAIL=$Email/" -e "s/SITE_ID=/SITE_ID=$($Site.Id)/" vars
         export SETUP_ARGS="-i$(if ($UseEnterpriseCa) {"e"})"
         
@@ -1250,9 +1250,14 @@ Function New-TunnelEnvironment {
     New-ResourceGroup
     New-TunnelVM
     
-    New-ProxyVM
-    Initialize-Proxy
-    Invoke-ProxyScript
+    if ($NoProxy) {
+        Write-Host "Skipping proxy VM creation..."
+        $script:ProxyIP = ""
+    } else {
+        New-ProxyVM
+        Initialize-Proxy
+        Invoke-ProxyScript
+    }
     
     New-NetworkRules
 
