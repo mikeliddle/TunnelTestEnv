@@ -55,7 +55,7 @@ ConfigureSquid() {
         LogError "Failed to configure Squid."
         exit 1
     fi
-    
+
     sudo systemctl restart squid
     LogInfo "Squid configured."
 }
