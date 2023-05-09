@@ -14,8 +14,6 @@ LogWarning() {
 
 InstallPrereqs() {
     LogInfo "Installing prerequisites..."
-<<<<<<< HEAD
-<<<<<<< HEAD
     maxRetries=3
     retryCount=0
     installSucceeded=1
@@ -40,42 +38,16 @@ InstallPrereqs() {
         exit 1
     fi
     
-=======
-    sudo apt-get update
-    sudo apt-get install -y squid
->>>>>>> 28c56ca (moved proxy configuration to use separate VM)
-=======
-    sudo apt-get -y update >> install.log 2>&1
-    sudo apt-get install -y squid >> install.log 2>&1
-    
-    if [ $? -ne 0 ]; then
-        LogError "Failed to install prerequisites."
-        exit 1
-    fi
-    
->>>>>>> 9c92875 (fixing proxy issues)
     LogInfo "Prerequisites installed."
 }
 
 Uninstall() {
     LogInfo "Uninstalling..."
-<<<<<<< HEAD
-<<<<<<< HEAD
     sudo apt-get remove -y squid >> install.log 2>&1
-=======
-    sudo apt-get remove -y squid
->>>>>>> 28c56ca (moved proxy configuration to use separate VM)
-=======
-    sudo apt-get remove -y squid >> install.log 2>&1
->>>>>>> 9c92875 (fixing proxy issues)
     LogInfo "Uninstalled."
 }
 
 ConfigureSquid() {
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> 58a02f7 (more proxy troubleshooting)
     cp ./squid.conf.tmp /etc/squid/squid.conf
     cp ./allowlist.tmp /etc/squid/allowlist
     
@@ -83,20 +55,7 @@ ConfigureSquid() {
         LogError "Failed to configure Squid."
         exit 1
     fi
-
-=======
-    cp ./squid.conf /etc/squid/squid.conf
-    cp ./allowlist /etc/squid/allowlist
-<<<<<<< HEAD
->>>>>>> 28c56ca (moved proxy configuration to use separate VM)
-=======
     
-    if [ $? -ne 0 ]; then
-        LogError "Failed to configure Squid."
-        exit 1
-    fi
-
->>>>>>> 9c92875 (fixing proxy issues)
     sudo systemctl restart squid
     LogInfo "Squid configured."
 }
