@@ -1046,4 +1046,4 @@ Function Remove-AndroidProfiles {
     Remove-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP"
     Remove-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR"
 }
-#endregion Scenario Functions
+#endregion Scenario Functionss
