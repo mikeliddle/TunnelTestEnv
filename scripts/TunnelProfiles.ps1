@@ -13,7 +13,8 @@ Function New-TunnelConfiguration {
     $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$ServerConfigurationName'" -Limit 1
     if ($ServerConfiguration) {
         Write-Host "Already found Server Configuration named '$ServerConfigurationName'"
-    } else {
+    }
+    else {
         $ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $ServerConfigurationName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Subnet -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes $ExcludeRoutes -RouteIncludes $IncludeRoutes -SplitDns @()    
     }
 
@@ -28,9 +29,10 @@ Function Remove-TunnelConfiguration {
     Write-Header "Deleting Server Configuration..."
     $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$ServerConfigurationName'" -Limit 1
 
-    if($ServerConfiguration) {
+    if ($ServerConfiguration) {
         Remove-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
-    } else {
+    }
+    else {
         Write-Host "Server Configuration '$ServerConfigurationName' does not exist."
     }
 }
@@ -47,8 +49,9 @@ Function New-TunnelSite {
 
     if ($Site) {
         Write-Host "Already found Site named '$SiteName'"
-    } else {
-        $Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $SiteName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id=$ServerConfiguration.id} -RoleScopeTagIds @("0") -UpgradeAutomatically    
+    }
+    else {
+        $Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $SiteName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id = $ServerConfiguration.id } -RoleScopeTagIds @("0") -UpgradeAutomatically    
     }
 
     return $Site
@@ -62,14 +65,15 @@ Function Remove-TunnelSite {
     Write-Header "Deleting Site..."
     $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
 
-    if($Site) {
+    if ($Site) {
         Remove-MgDeviceManagementMicrosoftTunnelSite -MicrosoftTunnelSiteId $Site.Id
-    } else {
+    }
+    else {
         Write-Host "Site '$SiteName' does not exist."
     }
 }
 
-Function New-TunnelAgent{
+Function New-TunnelAgent {
     param(
         [string] $RunningOS,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
@@ -78,7 +82,8 @@ Function New-TunnelAgent{
 
     if (-Not $TenantCredential) {
         $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
-    } else {
+    }
+    else {
         $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
     }
 
@@ -93,14 +98,15 @@ Function Remove-TunnelServers {
     Write-Header "Deleting Servers..."
     $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
 
-    if($Site){
+    if ($Site) {
         $servers = Get-MgDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Site.Id
 
         $servers | ForEach-Object {
             Write-Header "Deleting '$($_.DisplayName)'..."
             Invoke-MgGraphRequest -Method DELETE -Uri "https://graph.microsoft.com/beta/deviceManagement/microsoftTunnelSites/$($Site.Id)/microsoftTunnelServers/$($_.Id)"
         }
-    } else {
+    }
+    else {
         Write-Host "No site found for '$SiteName', so no servers will be deleted."
     }
 }
@@ -115,12 +121,10 @@ Function Update-PrivateDNSAddress {
 
     Write-Header "Updating server configuration private DNS..."
 
-    if ($Image.Contains("RHEL"))
-    {
+    if ($Image.Contains("RHEL")) {
         $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
     }
-    else
-    {
+    else {
         $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
     }
 
@@ -144,26 +148,26 @@ Function Update-ADApplication {
     )
     
     $App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
-    if($App) {
+    if ($App) {
         Write-Success "Client Id: $($App.AppId)"
         Write-Success "Tenant Id: $($TenantId)"
 
-        if ($BundleIds -and $BundleIds.Count -gt 0){
+        if ($BundleIds -and $BundleIds.Count -gt 0) {
             Write-Header "Found AD Application '$ADApplication'..."
             $uris = [System.Collections.ArrayList]@()
             foreach ($bundle in $BundleIds) {
                 $uri1 = "msauth://code/msauth.$bundle%3A%2F%2Fauth"
                 $uri2 = "msauth.$($bundle)://auth"
-                if(-Not $App.PublicClient.RedirectUris.Contains($uri1)) {
+                if (-Not $App.PublicClient.RedirectUris.Contains($uri1)) {
                     Write-Host "Missing Uri '$uri1' for '$bundle', preparing to add."
                     $uris.Add($uri1) | Out-Null
                 }
-                if(-Not $App.PublicClient.RedirectUris.Contains($uri2)) {
+                if (-Not $App.PublicClient.RedirectUris.Contains($uri2)) {
                     Write-Host "Missing Uri '$uri2' for '$bundle', preparing to add."
                     $uris.Add($uri2) | Out-Null
                 }
             }
-            if($uris.Count -gt 0) {
+            if ($uris.Count -gt 0) {
                 $newUris = $App.PublicClient.RedirectUris + $uris
                 $PublicClient = @{
                     RedirectUris = $newUris
@@ -173,32 +177,33 @@ Function Update-ADApplication {
                 Update-MgApplication -ApplicationId $App.Id -PublicClient $PublicClient
             }
         }
-    } else {
+    }
+    else {
         Write-Header "Creating AD Application '$ADApplication'..."
         $RequiredResourceAccess = @(
             @{
-                ResourceAppId = "00000003-0000-0000-c000-000000000000"
+                ResourceAppId  = "00000003-0000-0000-c000-000000000000"
                 ResourceAccess = @(
                     @{
-                        Id = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+                        Id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
                         Type = "Scope"
                     }
                 )
             }
             @{
-                ResourceAppId = "0a5f63c0-b750-4f38-a71c-4fc0d58b89e2"
+                ResourceAppId  = "0a5f63c0-b750-4f38-a71c-4fc0d58b89e2"
                 ResourceAccess = @(
                     @{
-                        Id = "3c7192af-9629-4473-9276-d35e4e4b36c5"
+                        Id   = "3c7192af-9629-4473-9276-d35e4e4b36c5"
                         Type = "Scope"
                     }
                 )
             }
             @{
-                ResourceAppId = "3678c9e9-9681-447a-974d-d19f668fcd88"
+                ResourceAppId  = "3678c9e9-9681-447a-974d-d19f668fcd88"
                 ResourceAccess = @(
                     @{
-                        Id = "eb539595-3fe1-474e-9c1d-feb3625d1be5"
+                        Id   = "eb539595-3fe1-474e-9c1d-feb3625d1be5"
                         Type = "Scope"
                     }
                 )
@@ -206,15 +211,15 @@ Function Update-ADApplication {
         )
         
         $OptionalClaims = @{
-            IdToken = @()
+            IdToken     = @()
             AccessToken = @(
                 @{
-                    Name = "acct"
-                    Essential = $false
+                    Name                 = "acct"
+                    Essential            = $false
                     AdditionalProperties = @()
                 }
             )
-            Saml2Token = @()
+            Saml2Token  = @()
         }
         $uris = [System.Collections.ArrayList]@()
         foreach ($bundle in $BundleIds) {
@@ -267,7 +272,8 @@ Function New-IosAppProtectionPolicy {
     $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($IosAppProtectionPolicy) {
         Write-Host "Already found App Protection policy named '$DisplayName'"
-    } else {
+    }
+    else {
         Write-Header "Creating App Protection policy '$DisplayName'..."
         $IosAppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
         Write-Header "Targeting bundles to '$DisplayName'..."
@@ -320,7 +326,8 @@ Function New-IosTrustedRootPolicy {
 
     if ($IosTrustedRootPolicy) {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
-    } else {
+    }
+    else {
         $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
@@ -367,7 +374,8 @@ Function New-IosDeviceConfigurationPolicy {
 
     if ($IosDeviceConfigurationPolicy) {
         Write-Host "Already found Device Configuration policy named '$DisplayName'"
-    } else {
+    }
+    else {
         Write-Header "Creating Device Configuration policy '$DisplayName'..."
         $Body = @{
             "@odata.type"         = "#microsoft.graph.iosVpnConfiguration"
@@ -382,7 +390,7 @@ Function New-IosDeviceConfigurationPolicy {
                 address     = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             }
-            proxyServer           = if ($PACUrl -ne "") {@{ automaticConfigurationScriptUrl = "$PACUrl" }} else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+            proxyServer           = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
             customData            = @(@{
                     key   = "MSTunnelProtectMode"
                     value = "1"
@@ -423,7 +431,8 @@ Function New-IosAppConfigurationPolicy {
     $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($IosAppConfigurationPolicy) {
         Write-Host "Already found App Configuration policy named '$DisplayName'"
-    } else {
+    }
+    else {
         Write-Header "Creating App Configuration policy '$DisplayName'..."
         $customSettings = @(
             @{
@@ -529,7 +538,8 @@ Function New-AndroidTrustedRootPolicy {
     $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
     if ($AndroidTrustedRootPolicy) {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
-    } else {
+    }
+    else {
         $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
@@ -575,7 +585,8 @@ Function New-AndroidDeviceConfigurationPolicy {
 
     if ($AndroidDeviceConfigurationPolicy) {
         Write-Host "Already found Device Configuration policy named '$DisplayName'"
-    } else {
+    }
+    else {
         Write-Header "Creating Device Configuration policy '$DisplayName'..."
         $Body = @{
             "@odata.type"         = "#microsoft.graph.androidWorkProfileVpnConfiguration"
@@ -590,7 +601,7 @@ Function New-AndroidDeviceConfigurationPolicy {
                     address     = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                     description = ""
                 })
-            proxyServer           = if ($PACUrl -ne "") {@{ automaticConfigurationScriptUrl = "$PACUrl" }} else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+            proxyServer           = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
             customData            = @(@{
                     key   = "MicrosoftDefenderAppSettings"
                     value = $null
@@ -624,7 +635,8 @@ Function New-AndroidAppProtectionPolicy {
     $AndroidAppProtectionPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'"
     if ($AndroidAppProtectionPolicy) {
         Write-Host "Already found App Protection policy named '$DisplayName'"
-    } else {
+    }
+    else {
         Write-Header "Targeting bundles to '$DisplayName'..."
 
         $customApps = $BundleIds | ForEach-Object { 
@@ -709,7 +721,8 @@ Function New-AndroidAppConfigurationPolicy {
     $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($AndroidAppConfigurationPolicy) {
         Write-Host "Already found App Configuration policy named '$DisplayName'"
-    } else {
+    }
+    else {
         Write-Header "Creating App Configuration policy '$DisplayName'..."
 
 
@@ -849,7 +862,8 @@ Function Remove-IosAppProtectionPolicy {
     $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($IosAppProtectionPolicy) {
         Remove-MgDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $IosAppProtectionPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "App Protection Policy '$DisplayName' does not exist."
     }
 }
@@ -865,7 +879,8 @@ Function Remove-IosTrustedRootPolicy {
 
     if ($IosTrustedRootPolicy) {
         Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosTrustedRootPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "Trusted Root Policy '$DisplayName' does not exist."
     }
 }
@@ -881,7 +896,8 @@ Function Remove-IosDeviceConfigurationPolicy {
 
     if ($IosDeviceConfigurationPolicy) {
         Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosDeviceConfigurationPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "Device Configuration Policy '$DisplayName' does not exist."
     }
 }
@@ -897,7 +913,8 @@ Function Remove-IosAppConfigurationPolicy {
     
     if ($IosAppConfigurationPolicy) {
         Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $IosAppConfigurationPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "App Configuration Policy '$DisplayName' does not exist."
     }
 }
@@ -913,7 +930,8 @@ Function Remove-AndroidTrustedRootPolicy {
     
     if ($AndroidDeviceConfigurationPolicy) {
         Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "Device Configuration Policy '$DisplayName' does not exist."
     }
 }
@@ -929,7 +947,8 @@ Function Remove-AndroidDeviceConfigurationPolicy {
     
     if ($AndroidDeviceConfigurationPolicy) {
         Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "Device Configuration Policy '$DisplayName' does not exist."
     }
 }
@@ -945,7 +964,8 @@ Function Remove-AndroidAppProtectionPolicy {
     
     if ($AndroidAppProtectionPolicy) {
         Remove-MgDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $AndroidAppProtectionPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "App Protection Policy '$DisplayName' does not exist."
     }
 }
@@ -961,7 +981,8 @@ Function Remove-AndroidAppConfigurationPolicy {
     
     if ($AndroidAppConfigurationPolicy) {
         Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $AndroidAppConfigurationPolicy.Id
-    } else {
+    }
+    else {
         Write-Host "App Configuration Policy '$DisplayName' does not exist."
     }
 }
@@ -989,7 +1010,7 @@ Function New-IosProfiles {
     }
 }
 
-Function Remove-IosProfiles{
+Function Remove-IosProfiles {
     param(
         [string] $VmName
     )

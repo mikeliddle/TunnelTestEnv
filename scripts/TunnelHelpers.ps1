@@ -6,7 +6,7 @@ Function Write-Success([string]$Message) {
     Write-Host $Message -ForegroundColor Green
 }
 
-Function New-SSHKeys{
+Function New-SSHKeys {
     param(
         [string] $SshKeyPath
     )
@@ -14,7 +14,7 @@ Function New-SSHKeys{
     ssh-keygen -t rsa -b 4096 -f $SshKeyPath -q -N ""
 }
 
-Function Move-SSHKeys{
+Function Move-SSHKeys {
     param(
         [string] $SshKeyPath,
         [string] $VmName
@@ -24,7 +24,7 @@ Function Move-SSHKeys{
     Move-Item -Path ~/.ssh/id_rsa.pub -Destination ~/.ssh/$VmName.pub -Force    
 }
 
-Function Remove-SSHKeys{
+Function Remove-SSHKeys {
     param(
         [string] $SshKeyPath,
         [string] $VmName
@@ -32,13 +32,15 @@ Function Remove-SSHKeys{
     Write-Header "Deleting SSH keys..."
     if (Test-Path $SshKeyPath) {
         Remove-Item -Path $SshKeyPath -Force
-    } else {
+    }
+    else {
         Write-Host "Key at path '$SshKeyPath' does not exist."
     }
 
     if (Test-Path ~/.ssh/$VmName.pub) {
         Remove-Item -Path ~/.ssh/$VmName.pub -Force 
-    } else {
+    }
+    else {
         Write-Host "Key at path '~/.ssh/$VmName.pub' does not exist."
     }
 }

@@ -38,12 +38,12 @@ Function Initialize-Proxy {
     $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
     $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
 
-    (Get-Content $configFile) -replace "##DOMAIN_NAME##","$TunnelServer" | out-file "$configFile.tmp"
-    (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##","$TunnelServer" | out-file "$allowlistFile.tmp"
+    (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$configFile.tmp"
+    (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
 
     $proxyBypassNames = ("www.google.com", "excluded.$($TunnelServer)")
     foreach ($name in $proxyBypassNames) {
-        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES","`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile.tmp"
+        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile.tmp"
     }
 
     # Replace CR+LF with LF

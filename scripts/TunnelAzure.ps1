@@ -23,7 +23,8 @@ Function Remove-ResourceGroup {
     if ([bool](az group show --name $resourceGroup 2> $null)) {
         Write-Header "Deleting resource group '$resourceGroup'..."
         az group delete --name $resourceGroup --yes --no-wait
-    } else {
+    }
+    else {
         Write-Host "Group '$resourceGroup' does not exist"
     }
 }
@@ -54,8 +55,7 @@ Function New-NetworkRules {
     )
     Write-Header "Creating network rules..."
     
-    if ($WithSSHOpen)
-    {
+    if ($WithSSHOpen) {
         az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
     }
     
