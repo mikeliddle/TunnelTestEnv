@@ -1,56 +1,70 @@
 [cmdletbinding(DefaultParameterSetName="Create")]
 param(
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$true, ParameterSetName="Delete")]
     [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
     [string]$VmName,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string[]]$BundleIds=@(),
 
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
     [string]$GroupName,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [ValidateSet("ios","android","all")]
     [string]$Platform="all",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","westus3","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [ValidateSet("PE","SelfHost","OneDF")]
     [string]$Environment="PE",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [string]$Email="",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string]$Username="azureuser",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [string]$Size = "Standard_B2s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [string]$ProxySize = "Standard_B2s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
     
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string]$ADApplication = "Generated MAM Tunnel",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [string]$SubscriptionId,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [switch]$NoProxy,
 
@@ -58,10 +72,12 @@ param(
     [switch]$UseEnterpriseCa,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [pscredential]$VmTenantCredential,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [pscredential]$TenantCredential,
@@ -73,22 +89,27 @@ param(
     [switch]$ProfilesOnly,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [switch]$StayLoggedIn,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [switch]$WithSSHOpen,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string]$PACUrl,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string[]]$IncludeRoutes=@(),
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [string[]]$ExcludeRoutes=@(),
 
@@ -160,6 +181,8 @@ Function New-RandomPassword {
         # Add the character at the random index to the password
         $password += $validCharacters[$randomIndex]
     }
+
+    Write-Success "Generated password: $password"
 
     # Output the password
     return $password
@@ -1273,25 +1296,71 @@ Function New-AndroidProfiles{
 #endregion Profile Functions
 
 #region ADFS Functions
+Function Initialize-ADFSVariables {
+    $script:VmName = $VmName.ToLower()
+    $script:Account = (az account show | ConvertFrom-Json)
+    $script:Subscription = $Account.id
+
+    if ($Email -eq "") {
+        Write-Header "Email not provided. Detecting email..."
+        $script:Email = $Account.user.name
+        Write-Host "Detected your email as '$Email'"
+    }
+
+    $script:ResourceGroup = "$VmName-group"
+    $script:GraphContext = Get-MgContext
+}
+
 Function New-ADFSEnvironment {
     Write-Header "Creating ADFS Environment"
 
-    Write-Header "Creating VM '$VmName-dc'..."
+    Test-Prerequisites
+    Login
+    Initialize-ADFSVariables
+    New-ResourceGroup
+
+    New-ADDCVM
+
+    # Temporarily undo all the work done to create
+    # Remove-ResourceGroup
+}
+
+Function New-ADDCVM {
     $AdminPassword = New-RandomPassword
-    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name "$VmName-dc" --image $WindowsServerImage --size $WindowsVmSize --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
+    $length = if($VmName.Length -gt 12) { 12 } Else { $VmName.Length }
+    $winName=$VmName.Substring(0,$length) + "-dc"
+    
+    Write-Header "Creating VM '$winName'..."
+
+    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
 `
     # Install AD DS role on the first VM and promote it to a domain controller
-    az vm run-command invoke `
-    -g $ResourceGroupName `
-    -n "$($VmName)-dc" `
-    -c RunPowerShellScript `
-    -s @'
-Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-Import-Module ADDSDeployment
-Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "F:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0])" -ForestMode Win2012R2 -InstallDns:$true -LogPath "F:\NTDS" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
-Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "F:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "F:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "F:\SYSVOL" -Force:$true
-Install-WindowsFeature ADFS-Federation
-'@
+    az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+        Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+        Import-Module ADDSDeployment
+        $length = if($DomainName.Split('.')[0].Length -gt 15) { 15 } Else { $DomainName.Split('.')[0].Length }
+        Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "D:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0].Substring(0,$length))" -ForestMode Win2012R2 -InstallDns:$true -LogPath "D:\NTDS" -NoRebootOnCompletion:$false -SysvolPath "D:\SYSVOL" -Force:$true
+        Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "D:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "D:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "D:\SYSVOL" -Force:$true
+"@
+
+    # Create AD Users and groups
+    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    Import-Module ActiveDirectory
+    New-ADUser -Name $Username -AccountPassword (ConvertTo-SecureString "$Password" -AsPlainText -Force) -Enabled $true -PasswordNeverExpires $true -ChangePasswordAtLogon $false -Path "CN=Users,DC=$DomainName" -SamAccountName $Username -UserPrincipalName "$Username@$DomainName"
+    New-ADGroup -Name $GroupName -GroupCategory Security -GroupScope Global -Path "CN=Users,DC=$DomainName" -SamAccountName $GroupName
+    Add-ADGroupMember -Identity $GroupName -Members $Username
+"@
+
+    # Create a GMSA account
+    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    Add-KdsRootKey -EffectiveTime (Get-Date).AddHours(-10)
+    New-ADServiceAccount FsGmsa -DNSHostName adfs.$DomainName -ServicePrincipalNames http/adfs.$DomainName
+"@
+
+    # Install Federation Server 
+    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    Install-WindowsFeature ADFS-Federation -IncludeManagementTools
+"@
 }
 #endregion ADFS Functions
 
@@ -1303,10 +1372,6 @@ Function New-TunnelEnvironment {
     New-SSHKeys
     New-ResourceGroup
     New-TunnelVM
-    
-    New-ProxyVM
-    Initialize-Proxy
-    Invoke-ProxyScript
     
     if ($NoProxy) {
         Write-Host "Skipping proxy VM creation..."
@@ -1384,7 +1449,6 @@ if ($ProfilesOnly) {
     Remove-TunnelEnvironment
 } elseif ($WithADFS) {
     New-ADFSEnvironment
-    New-TunnelEnvironment
 } else {
     New-TunnelEnvironment
 }
