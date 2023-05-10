@@ -1,0 +1,915 @@
+#region Tunnel Server Profiles
+Function New-TunnelConfiguration {
+    param(
+        [string] $ServerConfigurationName,
+        [int] $ListenPort = 443,
+        [string[]] $DnsServers = @("8.8.8.8"),
+        [string] $Subnet = "169.254.0.0/16",
+        [string[]] $IncludeRoutes = @(),
+        [string[]] $ExcludeRoutes = @()
+    )
+
+    Write-Header "Creating Server Configuration..."
+    $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$ServerConfigurationName'" -Limit 1
+    if ($ServerConfiguration) {
+        Write-Host "Already found Server Configuration named '$ServerConfigurationName'"
+    } else {
+        $ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $ServerConfigurationName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Subnet -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes $ExcludeRoutes -RouteIncludes $IncludeRoutes -SplitDns @()    
+    }
+
+    return $ServerConfiguration
+}
+
+Function Remove-TunnelConfiguration {
+    param(
+        [string] $ServerConfigurationName
+    )
+
+    Write-Header "Deleting Server Configuration..."
+    $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$ServerConfigurationName'" -Limit 1
+
+    if($ServerConfiguration) {
+        Remove-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    } else {
+        Write-Host "Server Configuration '$ServerConfigurationName' does not exist."
+    }
+}
+
+Function New-TunnelSite {
+    param(
+        [string] $SiteName,
+        [string] $FQDN,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
+    )
+
+    Write-Header "Creating Site..."
+    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
+
+    if ($Site) {
+        Write-Host "Already found Site named '$SiteName'"
+    } else {
+        $Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $SiteName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id=$ServerConfiguration.id} -RoleScopeTagIds @("0") -UpgradeAutomatically    
+    }
+
+    return $Site
+}
+
+Function Remove-TunnelSite {
+    param(
+        [string] $SiteName
+    )
+
+    Write-Header "Deleting Site..."
+    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
+
+    if($Site) {
+        Remove-MgDeviceManagementMicrosoftTunnelSite -MicrosoftTunnelSiteId $Site.Id
+    } else {
+        Write-Host "Site '$SiteName' does not exist."
+    }
+}
+
+Function New-TunnelAgent{
+    param(
+        [string] $RunningOS,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [pscredential] $TenantCredential
+    )
+
+    if (-Not $TenantCredential) {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
+    } else {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+    }
+
+    return $JWT
+}
+
+Function Remove-TunnelServers {
+    param(
+        [string] $SiteName
+    )
+
+    Write-Header "Deleting Servers..."
+    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
+
+    if($Site){
+        $servers = Get-MgDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Site.Id
+
+        $servers | ForEach-Object {
+            Write-Header "Deleting '$($_.DisplayName)'..."
+            Invoke-MgGraphRequest -Method DELETE -Uri "https://graph.microsoft.com/beta/deviceManagement/microsoftTunnelSites/$($Site.Id)/microsoftTunnelServers/$($_.Id)"
+        }
+    } else {
+        Write-Host "No site found for '$SiteName', so no servers will be deleted."
+    }
+}
+
+Function Update-PrivateDNSAddress {
+    param(
+        [string] $FQDN,
+        [string] $VmUsername,
+        [string] $sshKeyPath,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
+    )
+
+    Write-Header "Updating server configuration private DNS..."
+
+    if ($Image.Contains("RHEL"))
+    {
+        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
+    }
+    else
+    {
+        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
+    }
+
+    $newServers = $DNSPrivateAddress
+    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    return Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+}
+
+Export-ModuleMember -Function New-TunnelConfiguration, New-TunnelSite, New-TunnelAgent
+Export-ModuleMember -Function Remove-TunnelConfiguration, Remove-TunnelSite, Remove-TunnelServers
+Export-ModuleMember -Function Update-PrivateDNSAddress
+
+#endregion Tunnel Server Profiles
+
+#region Create iOS Functions
+Function New-IosAppProtectionPolicy {
+    param(
+        [string] $DisplayName,
+        [string[]] $BundleIds,
+        [string] $groupId
+    )
+
+    $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($IosAppProtectionPolicy) {
+        Write-Host "Already found App Protection policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating App Protection policy '$DisplayName'..."
+        $IosAppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
+        Write-Header "Targeting bundles to '$DisplayName'..."
+        $targetedApps = $BundleIds | ForEach-Object { 
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.iosMobileAppIdentifier"
+                    bundleId      = $_
+                }
+            }
+        }
+        if (-not ($targetedApps -is [array])) {
+            $targetedApps = @($targetedApps)
+        }
+        $body = @{
+            apps         = $targetedApps
+            appGroupType = "selectedPublicApps"
+        } | ConvertTo-Json -Depth 10
+        
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/targetApps" -Body $Body
+        
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$groupId'..."
+        $Body = @{
+            assignments = @(
+                @{
+                    target = @{
+                        groupId                                    = $groupId
+                        deviceAndAppManagementAssignmentFilterId   = $null
+                        deviceAndAppManagementAssignmentFilterType = "none"
+                        "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                }
+            )
+        } | ConvertTo-Json -Depth 10
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/assign" -Body $Body
+    }
+
+    return $IosAppProtectionPolicy
+}
+
+Function New-IosTrustedRootPolicy {
+    param(
+        [string] $DisplayName,
+        [string] $certFileName,
+        [string] $GroupId
+    )
+
+    $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if ($IosTrustedRootPolicy) {
+        Write-Host "Already found Trusted Root policy named '$DisplayName'"
+    } else {
+        $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        
+        $Body = @{
+            "@odata.type"          = "#microsoft.graph.iosTrustedRootCertificate"
+            displayName            = $DisplayName
+            id                     = [System.Guid]::Empty.ToString()
+            roleScopeTagIds        = @("0")
+            certFileName           = "$DisplayName.cer"
+            trustedRootCertificate = $certValue
+        } | ConvertTo-Json -Depth 10
+
+        Write-Header "Creating Trusted Root Policy..."
+        $IosTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+        # re-fetch the policy so the root certificate is included
+        $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+        
+        $Body = @{
+            "assignments" = @(@{
+                    "target" = @{
+                        "groupId"     = $GroupId
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                })
+        }
+    
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosTrustedRootPolicy.Id)/assign" -Body $Body
+    }
+
+    return $IosTrustedRootPolicy
+}
+
+Function New-IosDeviceConfigurationPolicy {
+    param(
+        [string] $DisplayName,
+        [string] $PACUrl = "",
+        [string] $ProxyHostname = "",
+        [string] $ProxyPort = "",
+        [string] $GroupId,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
+    )
+
+    $IosDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if ($IosDeviceConfigurationPolicy) {
+        Write-Host "Already found Device Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating Device Configuration policy '$DisplayName'..."
+        $Body = @{
+            "@odata.type"         = "#microsoft.graph.iosVpnConfiguration"
+            displayName           = $DisplayName
+            id                    = [System.Guid]::Empty.ToString()
+            roleScopeTagIds       = @("0")
+            authenticationMethod  = "usernameAndPassword"
+            connectionType        = "microsoftTunnel"
+            connectionName        = $DisplayName
+            microsoftTunnelSiteId = $Site.Id
+            server                = @{
+                address     = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+                description = ""
+            }
+            proxyServer           = if ($PACUrl -ne "") {@{ automaticConfigurationScriptUrl = "$PACUrl" }} else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+            customData            = @(@{
+                    key   = "MSTunnelProtectMode"
+                    value = "1"
+                })
+            enableSplitTunneling  = $false
+        } | ConvertTo-Json -Depth 10
+
+        $IosDeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+
+        $Body = @{
+            "assignments" = @(@{
+                    "target" = @{
+                        "groupId"     = $GroupId
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                })
+        }
+    
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosDeviceConfigurationPolicy.Id)/assign" -Body $Body
+    }
+
+    return $IosDeviceConfigurationPolicy
+}
+
+Function New-IosAppConfigurationPolicy {
+    param(
+        [string] $DisplayName,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfigurationPolicy] $TrustedRootPolicy,
+        [string[]] $BundleIds,
+        [string] $GroupId,
+        [string] $PACUrl = "",
+        [string] $ProxyHostname = "",
+        [string] $ProxyPort = ""
+    )
+
+    $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($IosAppConfigurationPolicy) {
+        Write-Host "Already found App Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating App Configuration policy '$DisplayName'..."
+        $customSettings = @(
+            @{
+                name  = "com.microsoft.intune.mam.managedbrowser.TunnelAvailable.IntuneMAMOnly"
+                value = "true"
+            }
+            @{
+                name  = "com.microsoft.tunnel.connection_type"
+                value = "MicrosoftProtect"
+            }
+            @{
+                name  = "com.microsoft.tunnel.connection_name"
+                value = $DisplayName
+            }
+            @{
+                name  = "com.microsoft.tunnel.site_id"
+                value = $Site.Id
+            }
+            @{
+                name  = "com.microsoft.tunnel.server_address"
+                value = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+            }
+            @{
+                name  = "com.microsoft.tunnel.trusted_root_certificates"
+                value = (@(
+                        @{
+                            "@odata.type"          = $IosTrustedRootPolicy.AdditionalProperties."@odata.type"
+                            id                     = $IosTrustedRootPolicy.Id
+                            displayName            = $IosTrustedRootPolicy.DisplayName
+                            lastModifiedDateTime   = $IosTrustedRootPolicy.LastModifiedDateTime
+                            trustedRootCertificate = $IosTrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                        }
+                    ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
+            }
+        )
+
+        if ($PACUrl -ne "") {
+            $customSettings += @(@{
+                    name  = "com.microsoft.tunnel.proxy_pacurl"
+                    value = $PACUrl
+                })
+        } elif ($ProxyHostname -ne "") {
+            $customSettings += @( @{
+                    name  = "com.microsoft.tunnel.proxy_address"
+                    value = $ProxyHostname
+                },
+                @{
+                    name  = "com.microsoft.tunnel.proxy_port"
+                    value = $ProxyPort
+                })
+        }
+
+        $targetedApps = $BundleIds | ForEach-Object { 
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.iosMobileAppIdentifier"
+                    bundleId      = $_
+                }
+            }
+        }
+        if (-not ($targetedApps -is [array])) {
+            $targetedApps = @($targetedApps)
+        }
+        $body = @{
+            apps                        = $targetedApps
+            assignments                 = @(
+                @{
+                    target = @{
+                        groupId                                    = $GroupId
+                        deviceAndAppManagementAssignmentFilterId   = $null
+                        deviceAndAppManagementAssignmentFilterType = "none"
+                        "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                }
+            )
+            appGroupType                = "selectedPublicApps"
+            customSettings              = $customSettings
+            displayName                 = $DisplayName
+            description                 = ""
+            roleScopeTagIds             = @()
+            scSettings                  = @()
+            targetedAppManagementLevels = "unspecified"
+        } | ConvertTo-Json -Depth 10 -Compress
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
+        $IosAppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
+    }
+    
+    return $IosAppConfigurationPolicy
+}
+
+Export-ModuleMember -Function New-IosAppProtectionPolicy, New-IosTrustedRootPolicy, New-IosDeviceConfigurationPolicy, New-IosAppConfigurationPolicy
+#endregion Create iOS Functions
+
+#region Create Android Functions
+Function New-AndroidTrustedRootPolicy {
+    param(
+        [string] $DisplayName,
+        [string] $certFileName,
+        [string] $GroupId
+    )
+
+    $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    if ($AndroidTrustedRootPolicy) {
+        Write-Host "Already found Trusted Root policy named '$DisplayName'"
+    } else {
+        $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        
+        $Body = @{
+            "@odata.type"          = "#microsoft.graph.androidWorkProfileTrustedRootCertificate"
+            displayName            = $DisplayName
+            id                     = [System.Guid]::Empty.ToString()
+            roleScopeTagIds        = @("0")
+            certFileName           = "$DisplayName.cer"
+            trustedRootCertificate = $certValue
+        } | ConvertTo-Json -Depth 10
+
+        Write-Header "Creating Trusted Root Policy..."
+        AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+        # re-fetch the policy so the root certificate is included
+        AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+        $Body = @{
+            "assignments" = @(@{
+                    "target" = @{
+                        "groupId"     = $GroupId
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                })
+        }
+    
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($AndroidTrustedRootPolicy.Id)/assign" -Body $Body
+    }
+    return $AndroidTrustedRootPolicy
+}
+
+Function New-AndroidDeviceConfigurationPolicy {
+    param(
+        [string] $DisplayName,
+        [string] $PACUrl = "",
+        [string] $ProxyHostname = "",
+        [string] $ProxyPort = "",
+        [string] $GroupId,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
+    )
+
+    $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if ($AndroidDeviceConfigurationPolicy) {
+        Write-Host "Already found Device Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating Device Configuration policy '$DisplayName'..."
+        $Body = @{
+            "@odata.type"         = "#microsoft.graph.androidWorkProfileVpnConfiguration"
+            displayName           = $DisplayName
+            id                    = [System.Guid]::Empty.ToString()
+            roleScopeTagIds       = @("0")
+            authenticationMethod  = "azureAD"
+            connectionType        = "microsoftProtect"
+            connectionName        = $DisplayName
+            microsoftTunnelSiteId = $Site.Id
+            servers               = @(@{
+                    address     = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+                    description = ""
+                })
+            proxyServer           = if ($PACUrl -ne "") {@{ automaticConfigurationScriptUrl = "$PACUrl" }} else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+            customData            = @(@{
+                    key   = "MicrosoftDefenderAppSettings"
+                    value = $null
+                })
+        } | ConvertTo-Json -Depth 10
+
+        $AndroidDeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+
+        $Body = @{
+            "assignments" = @(@{
+                    "target" = @{
+                        "groupId"     = $GroupId
+                        "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                })
+        }
+    
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($AndroidDeviceConfigurationPolicy.Id)/assign" -Body $Body
+    }
+
+    return $AndroidDeviceConfigurationPolicy
+}
+
+Function New-AndroidAppProtectionPolicy {
+    param(
+        [string] $DisplayName,
+        [string[]] $BundleIds,
+        [string] $GroupId
+    )
+
+    $AndroidAppProtectionPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'"
+    if ($AndroidAppProtectionPolicy) {
+        Write-Host "Already found App Protection policy named '$DisplayName'"
+    } else {
+        Write-Header "Targeting bundles to '$DisplayName'..."
+
+        $customApps = $BundleIds | ForEach-Object { 
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.androidMobileAppIdentifier"
+                    packageId     = $_
+                }
+            }
+        }
+        if (-not ($customApps -is [array])) {
+            $customApps = @($customApps)
+        }
+
+        $defaultApps = @(
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.androidMobileAppIdentifier"
+                    packageId     = "com.microsoft.scmx"
+                }
+            }
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.androidMobileAppIdentifier"
+                    packageId     = "com.microsoft.emmx"
+                }
+            }
+        )
+
+        $targetedApps = $customApps + $defaultApps
+
+        $body = @{
+            displayName          = $DisplayName
+            apps                 = $targetedApps
+            appGroupType         = "selectedPublicApps"
+            connectToVpnOnLaunch = $true
+        } | ConvertTo-Json -Depth 10
+        
+        Write-Header "Creating App Protection policy '$DisplayName'..."
+        $AndroidAppProtectionPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/androidManagedAppProtections" -Body $Body
+        
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
+        $Body = @{
+            assignments                 = @(
+                @{
+                    target = @{
+                        groupId                                    = $GroupId
+                        deviceAndAppManagementAssignmentFilterId   = $null
+                        deviceAndAppManagementAssignmentFilterType = "none"
+                        "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                }
+            )
+            appGroupType                = "selectedPublicApps"
+            customSettings              = $customSettings
+            displayName                 = $DisplayName
+            description                 = ""
+            roleScopeTagIds             = @()
+            scSettings                  = @()
+            targetedAppManagementLevels = "unspecified"
+        } | ConvertTo-Json -Depth 10 -Compress
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/androidManagedAppProtections('$($AndroidAppProtectionPolicy.Id)')/assign" -Body $Body
+    }
+
+    return $AndroidAppProtectionPolicy
+}
+
+Function New-AndroidAppConfigurationPolicy {
+    param(
+        [string] $DisplayName,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfigurationPolicy] $TrustedRootPolicy,
+        [string[]] $BundleIds,
+        [string] $GroupId,
+        [string] $PACUrl = "",
+        [string] $ProxyHostname = "",
+        [string] $ProxyPort = ""
+    )
+
+    $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($AndroidAppConfigurationPolicy) {
+        Write-Host "Already found App Configuration policy named '$DisplayName'"
+    } else {
+        Write-Header "Creating App Configuration policy '$DisplayName'..."
+
+
+        $perApps = ""
+        if ($BundleIds.Count -eq 0) {
+            $perApps = ""
+        }
+        elseif ($BundleIds.Count -eq 1) {
+            $perApps = $BundleIds[0]
+        }
+        else {
+            $BundleIds | ForEach-Object { 
+                $perApps = $perApps + "|" + $_
+            }
+        }
+
+        $customSettings = @(
+            @{
+                name  = "com.microsoft.intune.mam.managedbrowser.TunnelAvailable.IntuneMAMOnly"
+                value = "true"
+            }
+            @{
+                name  = "com.microsoft.tunnel.connection_type"
+                value = "MicrosoftProtect"
+            }
+            @{
+                name  = "com.microsoft.tunnel.connection_name"
+                value = $DisplayName
+            }
+            @{
+                name  = "com.microsoft.tunnel.site_id"
+                value = $Site.Id
+            }
+            @{
+                name  = "com.microsoft.tunnel.server_address"
+                value = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
+            }
+            @{
+                name  = "com.microsoft.tunnel.targeted_apps"
+                value = $perApps
+            }
+            @{
+                name  = "com.microsoft.tunnel.trusted_root_certificates"
+                value = (@(
+                        @{
+                            "@odata.type"          = $AndroidTrustedRootPolicy.AdditionalProperties."@odata.type"
+                            id                     = $AndroidTrustedRootPolicy.Id
+                            displayName            = $AndroidTrustedRootPolicy.DisplayName
+                            lastModifiedDateTime   = $AndroidTrustedRootPolicy.LastModifiedDateTime
+                            trustedRootCertificate = $AndroidTrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                        }
+                    ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
+            }
+        )
+
+        if ($PACUrl -ne "") {
+            $customSettings += @(@{
+                    name  = "com.microsoft.tunnel.proxy_pacurl"
+                    value = $PACUrl
+                })
+        } elif ($ProxyHostname -ne "") {
+            $customSettings += @( @{
+                    name  = "com.microsoft.tunnel.proxy_address"
+                    value = $ProxyHostname
+                },
+                @{
+                    name  = "com.microsoft.tunnel.proxy_port"
+                    value = $ProxyPort
+                })
+        }
+
+        $customApps = $BundleIds | ForEach-Object { 
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.androidMobileAppIdentifier"
+                    packageId     = $_
+                }
+            }
+        }
+        if (-not ($customApps -is [array])) {
+            $customApps = @($customApps)
+        }
+
+        $defaultApps = @(
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.androidMobileAppIdentifier"
+                    packageId     = "com.microsoft.scmx"
+                }
+            }
+            @{
+                mobileAppIdentifier = @{
+                    "@odata.type" = "#microsoft.graph.androidMobileAppIdentifier"
+                    packageId     = "com.microsoft.emmx"
+                }
+            }
+        )
+
+        $targetedApps = $customApps + $defaultApps
+
+        $body = @{
+            apps                        = $targetedApps
+            assignments                 = @(
+                @{
+                    target = @{
+                        groupId                                    = $GroupId
+                        deviceAndAppManagementAssignmentFilterId   = $null
+                        deviceAndAppManagementAssignmentFilterType = "none"
+                        "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
+                    }
+                }
+            )
+            appGroupType                = "selectedPublicApps"
+            customSettings              = $customSettings
+            displayName                 = $DisplayName
+            description                 = ""
+            roleScopeTagIds             = @()
+            scSettings                  = @()
+            targetedAppManagementLevels = "unspecified"
+        } | ConvertTo-Json -Depth 10 -Compress
+
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
+        $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
+    }
+
+    return $AndroidAppConfigurationPolicy
+}
+#endregion Create Android Functions
+
+#region Remove Functions
+Function Remove-IosAppProtectionPolicy {
+    param(
+        [string] $DisplayName
+    )
+    
+    Write-Header "Deleting App Protection Policy '$DisplayName'..."
+    $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    if ($IosAppProtectionPolicy) {
+        Remove-MgDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $IosAppProtectionPolicy.Id
+    } else {
+        Write-Host "App Protection Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-IosTrustedRootPolicy {
+    param(
+        [string] $DisplayName
+    )
+
+    Write-Header "Deleting Trusted Root Policy '$DisplayName'..."
+
+    $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if ($IosTrustedRootPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosTrustedRootPolicy.Id
+    } else {
+        Write-Host "Trusted Root Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-IosDeviceConfigurationPolicy {
+    param(
+        [string] $DisplayName
+    )
+
+    Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
+
+    $IosDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
+    if ($IosDeviceConfigurationPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosDeviceConfigurationPolicy.Id
+    } else {
+        Write-Host "Device Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-IosAppConfigurationPolicy {
+    param(
+        [string] $DisplayName
+    )
+    
+    Write-Header "Deleting App Configuration Policy '$DisplayName'..."
+    
+    $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    
+    if ($IosAppConfigurationPolicy) {
+        Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $IosAppConfigurationPolicy.Id
+    } else {
+        Write-Host "App Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-AndroidTrustedRootPolicy {
+    param(
+        [string] $DisplayName
+    )
+
+    Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
+    
+    $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    
+    if ($AndroidDeviceConfigurationPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
+    } else {
+        Write-Host "Device Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-AndroidDeviceConfigurationPolicy {
+    param(
+        [string] $DisplayName
+    )
+    
+    Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
+    
+    $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    
+    if ($AndroidDeviceConfigurationPolicy) {
+        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
+    } else {
+        Write-Host "Device Configuration Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-AndroidAppProtectionPolicy {
+    param(
+        [string] $DisplayName
+    )
+    
+    Write-Header "Deleting App Protection Policy '$DisplayName'..."
+    
+    $AndroidAppProtectionPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    
+    if ($AndroidAppProtectionPolicy) {
+        Remove-MgDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $AndroidAppProtectionPolicy.Id
+    } else {
+        Write-Host "App Protection Policy '$DisplayName' does not exist."
+    }
+}
+
+Function Remove-AndroidAppConfigurationPolicy {
+    param(
+        [string] $DisplayName
+    )
+    
+    Write-Header "Deleting App Configuration Policy '$DisplayName'..."
+    
+    $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    
+    if ($AndroidAppConfigurationPolicy) {
+        Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $AndroidAppConfigurationPolicy.Id
+    } else {
+        Write-Host "App Configuration Policy '$DisplayName' does not exist."
+    }
+}
+#endregion Remove Functions
+
+#region Scenario Functions
+Function New-IosProfiles {
+    param(
+        [string] $Platform,
+        [string] $VmName,
+        [string] $certFileName,
+        [string] $GroupId,
+        [string] $PACUrl = "",
+        [string] $ProxyHostname = "",
+        [string] $ProxyPort = "",
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
+    )
+
+    if ($Platform -eq "ios" -or $Platform -eq "all") {
+        $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
+        $IosDeviceConfigPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+        $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+        $IosAppConfigPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+    }
+}
+
+Function Remove-IosProfiles{
+    param(
+        [string] $VmName
+    )
+
+    Remove-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC"
+    Remove-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig"
+    Remove-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP"
+    Remove-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR"
+}
+
+Function New-AndroidProfiles {
+    param(
+        [string] $Platform,
+        [string] $VmName,
+        [string] $certFileName,
+        [string] $GroupId,
+        [string] $PACUrl = "",
+        [string] $ProxyHostname = "",
+        [string] $ProxyPort = "",
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
+    )
+
+    if ($Platform -eq "android" -or $Platform -eq "all") {
+        $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
+        $AndroidDeviceConfigPolicy = New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+        $AndroidAppProtectionPolicy = New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+        $AndroidAppConfigPolicy = New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+    }
+}
+
+Function Remove-AndroidProfiles {
+    param(
+        [string] $VmName
+    )
+
+    Remove-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC"
+    Remove-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig"
+    Remove-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP"
+    Remove-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR"
+}
+
+Export-ModuleMember -Function New-IosProfiles, Remove-IosProfiles, New-AndroidProfiles, Remove-AndroidProfiles
+#endregion Scenario Functions
