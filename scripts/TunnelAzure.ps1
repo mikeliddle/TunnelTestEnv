@@ -151,4 +151,3 @@ Function Update-RebootVM {
     az vm restart --resource-group $resourceGroup --name $VmName
 }
 #endregion Azure Functions
-
