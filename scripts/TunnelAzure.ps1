@@ -29,6 +29,16 @@ Function Remove-ResourceGroup {
 }
 
 Function New-TunnelVM {
+    param(
+        [string] $VmName,
+        [string] $Username = "azureuser",
+        [string] $Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
+        [string] $Size = "Standard_B2s",
+        [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
+        [string] $location = "westus",
+        [string] $resourceGroup = "$VmName-group"
+    )
+    
     Write-Header "Creating VM '$VmName'..."
     $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
 
