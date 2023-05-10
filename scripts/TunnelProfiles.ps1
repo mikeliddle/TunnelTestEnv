@@ -135,6 +135,127 @@ Export-ModuleMember -Function Update-PrivateDNSAddress
 
 #endregion Tunnel Server Profiles
 
+#region iOS MAM Specific Functions
+Function Update-ADApplication {
+    param(
+        [string] $ADApplication,
+        [string] $TenantId,
+        [string[]] $BundleIds
+    )
+    
+    $App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
+    if($App) {
+        Write-Success "Client Id: $($App.AppId)"
+        Write-Success "Tenant Id: $($TenantId)"
+
+        if ($BundleIds -and $BundleIds.Count -gt 0){
+            Write-Header "Found AD Application '$ADApplication'..."
+            $uris = [System.Collections.ArrayList]@()
+            foreach ($bundle in $BundleIds) {
+                $uri1 = "msauth://code/msauth.$bundle%3A%2F%2Fauth"
+                $uri2 = "msauth.$($bundle)://auth"
+                if(-Not $App.PublicClient.RedirectUris.Contains($uri1)) {
+                    Write-Host "Missing Uri '$uri1' for '$bundle', preparing to add."
+                    $uris.Add($uri1) | Out-Null
+                }
+                if(-Not $App.PublicClient.RedirectUris.Contains($uri2)) {
+                    Write-Host "Missing Uri '$uri2' for '$bundle', preparing to add."
+                    $uris.Add($uri2) | Out-Null
+                }
+            }
+            if($uris.Count -gt 0) {
+                $newUris = $App.PublicClient.RedirectUris + $uris
+                $PublicClient = @{
+                    RedirectUris = $newUris
+                }
+
+                Write-Header "Updating Redirect URIs..."
+                Update-MgApplication -ApplicationId $App.Id -PublicClient $PublicClient
+            }
+        }
+    } else {
+        Write-Header "Creating AD Application '$ADApplication'..."
+        $RequiredResourceAccess = @(
+            @{
+                ResourceAppId = "00000003-0000-0000-c000-000000000000"
+                ResourceAccess = @(
+                    @{
+                        Id = "e1fe6dd8-ba31-4d61-89e7-88639da4683d"
+                        Type = "Scope"
+                    }
+                )
+            }
+            @{
+                ResourceAppId = "0a5f63c0-b750-4f38-a71c-4fc0d58b89e2"
+                ResourceAccess = @(
+                    @{
+                        Id = "3c7192af-9629-4473-9276-d35e4e4b36c5"
+                        Type = "Scope"
+                    }
+                )
+            }
+            @{
+                ResourceAppId = "3678c9e9-9681-447a-974d-d19f668fcd88"
+                ResourceAccess = @(
+                    @{
+                        Id = "eb539595-3fe1-474e-9c1d-feb3625d1be5"
+                        Type = "Scope"
+                    }
+                )
+            }
+        )
+        
+        $OptionalClaims = @{
+            IdToken = @()
+            AccessToken = @(
+                @{
+                    Name = "acct"
+                    Essential = $false
+                    AdditionalProperties = @()
+                }
+            )
+            Saml2Token = @()
+        }
+        $uris = [System.Collections.ArrayList]@()
+        foreach ($bundle in $BundleIds) {
+            $uris.Add("msauth://code/msauth.$bundle%3A%2F%2Fauth") | Out-Null
+            $uris.Add("msauth.$($bundle)://auth") | Out-Null
+        }
+        $PublicClient = @{
+            RedirectUris = $uris
+        }
+        
+        $App = New-MgApplication -DisplayName $ADApplication -RequiredResourceAccess $RequiredResourceAccess -OptionalClaims $OptionalClaims -PublicClient $PublicClient -SignInAudience "AzureADMyOrg"
+
+        Write-Success "Client Id: $($App.AppId)"
+        Write-Success "Tenant Id: $($TenantId)"
+
+        Write-Header "You will need to grant consent. Opening browser in 15 seconds..."
+        Start-Sleep -Seconds 15
+        Start-Process "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationMenuBlade/~/CallAnAPI/appId/$($App.AppId)/isMSAApp~/false"
+    }
+
+    return $App
+}
+
+Function New-GeneratedXCConfig {
+    param(
+        [string[]] $bundle,
+        [string] $AppId,
+        [string] $TenantId
+
+    )
+    $Content = @"
+CONFIGURED_BUNDLE_IDENTIFIER = $bundle
+CONFIGURED_TENANT_ID = $($TenantId)
+CONFIGURED_CLIENT_ID = $($AppId)
+"@
+    Set-Content -Path "./Generated.xcconfig" -Value $Content -Force
+}
+
+Export-ModuleMember -Function Update-ADApplication, New-GeneratedXCConfig
+#endregion iOS MAM Specific Functions
+
 #region Create iOS Functions
 Function New-IosAppProtectionPolicy {
     param(
@@ -862,9 +983,9 @@ Function New-IosProfiles {
 
     if ($Platform -eq "ios" -or $Platform -eq "all") {
         $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
-        $IosDeviceConfigPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
-        $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
-        $IosAppConfigPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+        New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+        New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+        New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
     }
 }
 
@@ -894,9 +1015,9 @@ Function New-AndroidProfiles {
 
     if ($Platform -eq "android" -or $Platform -eq "all") {
         $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
-        $AndroidDeviceConfigPolicy = New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
-        $AndroidAppProtectionPolicy = New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
-        $AndroidAppConfigPolicy = New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+        New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+        New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+        New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
     }
 }
 
