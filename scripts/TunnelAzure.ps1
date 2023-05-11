@@ -99,5 +99,43 @@ Function New-NetworkRules {
     az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
+Function New-AdvancedNetworkRules {
+    param(
+        [string] $resourceGroup,
+        [string] $ProxyIP,
+        [string] $VmName,
+        [string] $WithSSHOpen = $false
+    )
+
+    if ($WithSSHOpen) {
+        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowSSHIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
+        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowRDPIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
+    }
+
+    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowHTTPSIn" --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
+    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowOutboundProxy" --priority 102 --source-address-prefixes "$ProxyIP" --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges * --access Allow --protocol '*' --description "Allow Proxy Outbound Traffic" > $null
+    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "DenyOutboundNoProxy" --priority 103 --source-address-prefixes '10.0.0.0/8' --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges * --access Deny --protocol '*' --description "Deny All Outbound Traffic" > $null
+
+}
+
+Function New-ServiceVM {
+    param(
+        [string] $VmName,
+        [string] $Username = "azureuser",
+        [string] $Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
+        [string] $Size = "Standard_B2s",
+        [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
+        [string] $location = "westus",
+        [string] $resourceGroup = "$VmName-group"
+    )
+    
+    Write-Header "Creating VM '$VmName-server'..."
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name "$VmName-server" --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-server" --admin-username $Username --only-show-errors | ConvertFrom-Json
+
+    Write-Host "DNS is '$vmdata.fqdns'"
+    return $vmdata
+}
+
 Export-ModuleMember -Function Login-Azure, New-ResourceGroup, Remove-ResourceGroup, New-TunnelVM, New-NetworkRules
 #endregion Azure Functions
+
