@@ -174,47 +174,10 @@ Function Test-Prerequisites {
 
 Function Login {
     if (-Not $ProfilesOnly) {
-        Write-Header "Logging into Azure..."
-        if (-Not $VmTenantCredential) {
-            Write-Header "Select the account to manage the VM."
-            az login --only-show-errors | Out-Null
-        } else {
-            az login -u $VmTenantCredential.UserName -p $VmTenantCredential.GetNetworkCredential().Password --only-show-errors | Out-Null
-        }
-
-        if ($SubscriptionId) {
-            Write-Header "Setting subscription to $SubscriptionId"
-            az account set --subscription $SubscriptionId | Out-Null
-        } else {
-            $accounts = (az account list | ConvertFrom-Json)
-            if ($accounts.Count -gt 1) {
-                foreach ($account in $accounts) {
-                    Write-Host "$($account.name) - $($account.id)"
-                }
-                $SubscriptionId = Read-Host "Please specify a subscription id: "
-                Write-Header "Setting subscription to $SubscriptionId"
-                az account set --subscription $SubscriptionId | Out-Null
-            }
-        }
+        Login-Azure
     }
     
-    Write-Header "Logging into graph..."
-    if (-Not $TenantCredential) {    
-        Write-Header "Select the account to manage the profiles."
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
-    } else {
-        $script:JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
-    }
-    
-    if (-Not $JWT) {
-        Write-Error "Could not get JWT for account"
-        Exit -1
-    }
-
-    Connect-MgGraph -AccessToken $script:JWT | Out-Null
-    
-    # Switch to beta since most of our endpoints are there
-    Select-MgProfile -Name "beta"    
+    Login-Graph
 }
 
 Function Logout {

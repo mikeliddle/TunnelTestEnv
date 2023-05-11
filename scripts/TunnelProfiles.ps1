@@ -1,3 +1,30 @@
+#region Graph Functions
+Function Login-Graph {
+    param(
+        [PSCredential] $TenantCredential = $null
+    )
+
+    Write-Header "Logging into graph..."
+    if (-Not $TenantCredential) {    
+        Write-Header "Select the account to manage the profiles."
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
+    } else {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+    }
+    
+    if (-Not $JWT) {
+        Write-Error "Could not get JWT for account"
+        Exit -1
+    }
+
+    Connect-MgGraph -AccessToken $JWT | Out-Null
+    
+    # Switch to beta since most of our endpoints are there
+    Select-MgProfile -Name "beta"    
+}
+Export-ModuleMember -Function Login-Graph
+#endregion Graph Functions
+
 #region Tunnel Server Profiles
 Function New-TunnelConfiguration {
     param(

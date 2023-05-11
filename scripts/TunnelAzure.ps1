@@ -1,4 +1,41 @@
 #region Azure Functions
+Function Login-Azure {
+    param(
+        [string] $SubscriptionId = "",
+        [PSCredential] $VmTenantCredential = $null
+    )
+    
+    if ($VmTenantCredential) {
+        az login -u $VmTenantCredential.UserName -p $VmTenantCredential.GetNetworkCredential().Password --only-show-errors | Out-Null
+        return
+    }
+
+    $accounts = az account list --only-show-errors | ConvertFrom-Json
+
+    if ($accounts.Count -eq 0) {
+        Write-Header "Logging into Azure..."
+
+        az login --only-show-errors | Out-Null
+        
+        if ($SubscriptionId) {
+            Write-Header "Setting subscription to $SubscriptionId"
+            az account set --subscription $SubscriptionId | Out-Null
+        } else {
+            $accounts = (az account list | ConvertFrom-Json)
+            if ($accounts.Count -gt 1) {
+                foreach ($account in $accounts) {
+                    Write-Host "$($account.name) - $($account.id)"
+                }
+                $SubscriptionId = Read-Host "Please specify a subscription id: "
+                Write-Header "Setting subscription to $SubscriptionId"
+                az account set --subscription $SubscriptionId | Out-Null
+            }
+        }
+    } else {
+        Write-Header "Already logged into Azure CLI as $($accounts[0].user.name)"
+        Write-Header "If you don't want to use this account, please logout, then run this script again."
+    }
+}
 Function New-ResourceGroup {
     param(
         [string] $resourceGroup,
@@ -62,5 +99,5 @@ Function New-NetworkRules {
     az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
-Export-ModuleMember -Function New-ResourceGroup, Remove-ResourceGroup, New-TunnelVM, New-NetworkRules
+Export-ModuleMember -Function Login-Azure, New-ResourceGroup, Remove-ResourceGroup, New-TunnelVM, New-NetworkRules
 #endregion Azure Functions
