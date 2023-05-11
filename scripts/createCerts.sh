@@ -40,8 +40,8 @@ SetupPrereqs() {
     which openssl > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         LogInfo "Installing prerequisites"
-        $update_command
-        $installer install -y openssl
+        $update_command >> install.log 2>&1
+        $installer install -y openssl >> install.log 2>&1
         if [ $? -ne 0 ]; then
             LogError "Failed to install openssl"
             exit 1
@@ -198,6 +198,10 @@ while getopts ":rsuixc:a:" opt; do
             ;;
         \?)
             Usage
+            exit 1
+            ;;
+        :)
+            LogError "Option -$OPTARG requires an argument."
             exit 1
             ;;
     esac
