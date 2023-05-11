@@ -133,9 +133,11 @@ while getopts ":hud:i:" opt; do
             ;;
         h)
             Usage
+            exit 1
             ;;
         \?)
             Usage
+            exit 1
             ;;
     esac
 done
