@@ -195,7 +195,7 @@ ConfigureCerts() {
     openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -certfile certs/serverchain.pem -passout pass: >> certs.log 2>&1
     
     cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
-    cat certs/server.pem certs/cacert.pem certs/intermediate-trimmed.pem > certs/serverchain.pem
+    cat certs/server.pem certs/intermediate-trimmed.pem certs/cacert.pem > certs/serverchain.pem
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
