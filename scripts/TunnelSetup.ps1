@@ -1,5 +1,37 @@
 #region Setup Script
+Function Initialize-TunnelServer {
+    param(
+        [String] $FQDN,
+        [String] $SiteId,
+        [String] $Environment,
+        [string] $sshKeyPath,
+        [string] $username = "azureuser"
+    )
+
+    Write-Header "Generating setup script..."
+    $ServerName = $FQDN.Split('.')[0]
+
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./scripts/createTunnel.sh "$($username)@$($FQDN):~/" > $null
+    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup-expect.sh "$($username)@$($FQDN):~/" > $null
+
+    $Content = Get-Content ./scripts/setup.exp
+    $Content = $Content -replace "##SITE_ID##", "$SiteId"
+    Set-Content -Path ./scripts/setup.exp -Value $Content -Force
+
+    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "chmod +x ~/Setup.sh"
+}
+
 Function Initialize-SetupScript {
+    param(
+        [String] $FQDN,
+        [String] $Environment,
+        [Switch] $NoProxy,
+        [Switch] $UseEnterpriseCa,
+        [String] $Email,
+        [Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [string] $username = "azureuser"
+    )
+
     try{
         Write-Header "Generating setup script..."
         $ServerName = $FQDN.Split('.')[0]
@@ -64,7 +96,35 @@ Function Initialize-SetupScript {
 }
 
 Function Invoke-SetupScript {
+    param(
+        [string] $sshKeyPath,
+        [string] $Username,
+        [string] $FQDN
+    )
     Write-Header "Connecting into remote server..."
     ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($FQDN)" "sudo su -c './Setup.sh'"
+}
+
+Function New-TunnelAgent {
+    param(
+        [string] $RunningOS,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
+        [pscredential] $TenantCredential
+    )
+
+    if (-Not $TenantCredential) {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
+    }
+    else {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+    }
+
+    return $JWT
+}
+
+Function New-DnsServer {
+    param(
+        [string] $VmName
+    )
 }
 #endregion Setup Script

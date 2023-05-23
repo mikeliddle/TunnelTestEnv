@@ -29,7 +29,7 @@ Usage() {
 
 SetupPrereqs() {
     LogInfo "Detecting OS"
-    if [ -f "/etc/debian_version" ]; the
+    if [ -f "/etc/debian_version" ]; then
         installer="apt-get"
         update_command="apt-get update"
     else
@@ -118,17 +118,18 @@ CreateServerCert() {
     openssl req -new -key private/server.key -out req/server.csr -config openssl.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/server.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/server.pem -extensions req_ext -extfile openssl.conf >> certs.log 2>&1
+
+    touch certs/serverchain.pem
+    cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
+    cat certs/server.pem certs/intermediate-trimmed.pem certs/cacert.pem > certs/serverchain.pem
+
     openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -certfile certs/serverchain.pem -passout pass: >> certs.log 2>&1
     
     if [ $? -ne 0 ]; then
         LogError "Failed to setup Leaf cert"
-        cp openssl.conf.bak openssl.conf
         cd $current_dir
         exit 1
     fi
-
-    cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
-    cat certs/server.pem certs/cacert.pem certs/intermediate-trimmed.pem > certs/serverchain.pem
 
     cp openssl.conf.bak openssl.conf
     cd $current_dir

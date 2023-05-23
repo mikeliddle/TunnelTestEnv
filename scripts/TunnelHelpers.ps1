@@ -6,6 +6,9 @@ Function Write-Success([string]$Message) {
     Write-Host $Message -ForegroundColor Green
 }
 
+Function Write-Warning([string]$Message) {
+    Write-Host $Message -ForegroundColor Yellow
+}
 Function New-SSHKeys {
     param(
         [string] $SshKeyPath
@@ -16,18 +19,16 @@ Function New-SSHKeys {
 
 Function Move-SSHKeys {
     param(
-        [string] $SshKeyPath,
-        [string] $VmName
+        [string] $SshKeyPath
     )
     Write-Header "Moving generated SSH keys..."
     Move-Item -Path ~/.ssh/id_rsa -Destination $SshKeyPath -Force
-    Move-Item -Path ~/.ssh/id_rsa.pub -Destination ~/.ssh/$VmName.pub -Force    
+    Move-Item -Path ~/.ssh/id_rsa.pub -Destination $SshKeyPath.pub -Force    
 }
 
 Function Remove-SSHKeys {
     param(
-        [string] $SshKeyPath,
-        [string] $VmName
+        [string] $SshKeyPath
     )
     Write-Header "Deleting SSH keys..."
     if (Test-Path $SshKeyPath) {
@@ -37,11 +38,11 @@ Function Remove-SSHKeys {
         Write-Host "Key at path '$SshKeyPath' does not exist."
     }
 
-    if (Test-Path ~/.ssh/$VmName.pub) {
-        Remove-Item -Path ~/.ssh/$VmName.pub -Force 
+    if (Test-Path "$SshKeyPath.pub") {
+        Remove-Item -Path "$SshKeyPath.pub" -Force 
     }
     else {
-        Write-Host "Key at path '~/.ssh/$VmName.pub' does not exist."
+        Write-Host "Key at path '$SshKeyPath.pub' does not exist."
     }
 }
 
@@ -73,5 +74,3 @@ Function New-RandomPassword {
     # Output the password
     return $password
 }
-
-Export-ModuleMember -Function Write-Header, Write-Success, New-SSHKeys, Move-SSHKeys, Remove-SSHKeys, New-RandomPassword

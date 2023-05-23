@@ -51,7 +51,7 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest", #"RedHat:RHEL:8-LVM:latest"
+    [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
     
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
@@ -85,7 +85,7 @@ param(
     [switch]$NoProxy,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [switch]$UseEnterpriseCa,
+    [switch]$NoPki,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
@@ -136,30 +136,7 @@ param(
     [string]$DomainName
 )
 
-$script:WindowsServerImage = "MicrosoftWindowsServer:WindowsServer:2022-Datacenter:latest"
-$script:WindowsVmSize = "Standard_DS1_v2"
-$script:Account = $null
-$script:GraphContext = $null
-$script:Subscription = $null
-$script:ResourceGroup = $null
-$script:SSHKeyPath = $null
-$script:FQDN = $null
-$script:ServerConfiguration = $null
-$script:Site = $null
-$script:App = $null
-$script:Group = $null
-$script:IosDeviceConfigurationPolicy = $null
-$script:AndroidDeviceConfigurationPolicy = $null
-$script:IosAppProtectionPolicy = $null
-$script:AndroidAppProtectionPolicy = $null
-$script:IosAppConfigurationPolicy = $null
-$script:AndroidAppConfigurationPolicy = $null
-$script:IosTrustedRootPolicy = $null
-$script:AndroidTrustedRootPolicy = $null
-$script:RunningOS = ""
-$script:PACUrl = ""
-$script:ProxyVMData = $null
-$script:ProxyIP = ""
+$script:SSHKeyPath = ""
 
 #region Helper Functions
 Function Initialize {
@@ -173,9 +150,9 @@ Function Initialize {
 
     if ($RHEL8) {
         $script:Image = "RedHat:RHEL:8-LVM:latest"
-    } elif ($RHEL7) {
+    } elseif ($RHEL7) {
         $script:Image = "RedHat:RHEL:7-LVM:latest"
-    } elif ($Centos7) {
+    } elseif ($Centos7) {
         $script:Image = "OpenLogic:CentOS:7_9:latest"
     } elseif ($Simple) {
         $script:NoProxy = $true
@@ -249,105 +226,42 @@ Function Initialize-Variables {
 }
 #endregion Helper Functions
 
-#region ADFS Functions
-Function Initialize-ADFSVariables {
-    $script:VmName = $VmName.ToLower()
-    $script:Account = (az account show | ConvertFrom-Json)
-    $script:Subscription = $Account.id
-
-    if ($Email -eq "") {
-        Write-Header "Email not provided. Detecting email..."
-        $script:Email = $Account.user.name
-        Write-Host "Detected your email as '$Email'"
-    }
-
-    $script:ResourceGroup = "$VmName-group"
-    $script:GraphContext = Get-MgContext
-}
-
-Function New-ADFSEnvironment {
-    Write-Header "Creating ADFS Environment"
-
-    Test-Prerequisites
-    Login
-    Initialize-ADFSVariables
-    New-ResourceGroup
-
-    New-ADDCVM
-
-    # Temporarily undo all the work done to create
-    # Remove-ResourceGroup
-}
-
-Function New-ADDCVM {
-    $AdminPassword = New-RandomPassword
-    $length = if($VmName.Length -gt 12) { 12 } Else { $VmName.Length }
-    $winName=$VmName.Substring(0,$length) + "-dc"
-    
-    Write-Header "Creating VM '$winName'..."
-
-    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
-`
-    # Install AD DS role on the first VM and promote it to a domain controller
-    az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
-        Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
-        Import-Module ADDSDeployment
-        $length = if($DomainName.Split('.')[0].Length -gt 15) { 15 } Else { $DomainName.Split('.')[0].Length }
-        Install-ADDSForest -CreateDnsDelegation:$false -DatabasePath "D:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0].Substring(0,$length))" -ForestMode Win2012R2 -InstallDns:$true -LogPath "D:\NTDS" -NoRebootOnCompletion:$false -SysvolPath "D:\SYSVOL" -Force:$true
-        Install-ADDSDomainController -CreateDnsDelegation:$false -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "D:\NTDS" -DomainName "$DomainName" -InstallDns:$true -LogPath "D:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -NoRebootOnCompletion:$false -SysvolPath "D:\SYSVOL" -Force:$true
-"@
-
-    # Create AD Users and groups
-    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
-    Import-Module ActiveDirectory
-    New-ADUser -Name $Username -AccountPassword (ConvertTo-SecureString "$Password" -AsPlainText -Force) -Enabled $true -PasswordNeverExpires $true -ChangePasswordAtLogon $false -Path "CN=Users,DC=$DomainName" -SamAccountName $Username -UserPrincipalName "$Username@$DomainName"
-    New-ADGroup -Name $GroupName -GroupCategory Security -GroupScope Global -Path "CN=Users,DC=$DomainName" -SamAccountName $GroupName
-    Add-ADGroupMember -Identity $GroupName -Members $Username
-"@
-
-    # Create a GMSA account
-    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
-    Add-KdsRootKey -EffectiveTime (Get-Date).AddHours(-10)
-    New-ADServiceAccount FsGmsa -DNSHostName adfs.$DomainName -ServicePrincipalNames http/adfs.$DomainName
-"@
-
-    # Install Federation Server 
-    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
-    Install-WindowsFeature ADFS-Federation -IncludeManagementTools
-"@
-}
-#endregion ADFS Functions
-
 #region Main Functions
 Function New-TunnelEnvironment {
-    Test-Prerequisites
     Login
     Initialize-Variables
-    New-SSHKeys
-    New-ResourceGroup
-    New-TunnelVM
-    
-    if ($NoProxy) {
-        Write-Host "Skipping proxy VM creation..."
-        $script:ProxyIP = ""
+    New-SSHKeys $SSHKeyPath
+
+    $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
+    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
+    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
+
+    $ServiceVMName = "$VmName-server"
+
+    if (-Not $Simple) {
+        $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+        New-AdvancedNetworkRules -resourceGroup $ResourceGroup.name -ProxyIP $ProxyIP -VmName $VmName -WithSSHOpen $WithSSHOpen
     } else {
-        New-ProxyVM
-        Initialize-Proxy
-        Invoke-ProxyScript
+        New-NetworkRules -resourceGroup $ResourceGroup.name -VmName $VmName -WithSSHOpen $WithSSHOpen
     }
     
-    New-NetworkRules
+    if (!$NoProxy) {
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name
+        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath
+    }
 
-    New-TunnelConfiguration
-    New-TunnelSite
+    $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns
+    $TunnelSite = New-TunnelSite -SiteName $VmName -FQDN $TunnelVM.fqdns -ServerConfiguration $ServerConfiguration
 
-    New-TunnelAgent
+    New-TunnelAgent -RunningOS $RunningOS -Site $TunnelSite -TenantCredential $TenantCredential
 
-    Initialize-SetupScript
-    Invoke-SetupScript
+    Initialize-SetupScript -FQDN $TunnelVm.fqdns -Environment $Environment -NoProxy $NoProxy -UseEnterpriseCa $UseEnterpriseCa -Email $Email -Site $TunnelSite -Username $Username
+    Invoke-SetupScript -sshKeyPath $SSHKeyPath -Username $Username -FQDN $TunnelVm.fqdns
 
-    Update-PrivateDNSAddress
+    Update-PrivateDNSAddress -FQDN $TunnelVm.fqdns -VmUsername $Username -sshKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration
     
+    exit
+
     Update-ADApplication
     New-GeneratedXCConfig
 
@@ -358,19 +272,18 @@ Function New-TunnelEnvironment {
 }
 
 Function Remove-TunnelEnvironment {
-    Test-Prerequisites
     Login
     Initialize-Variables
     
-    Remove-ResourceGroup
-    Remove-SSHKeys
+    Remove-ResourceGroup -resourceGroup "$VmName-group"
+    Remove-SSHKeys -sshKeyPath "$HOME/.ssh/$VmName"
 
-    Remove-IosProfiles
-    Remove-AndroidProfiles
+    Remove-IosProfiles -VmName $VmName
+    Remove-AndroidProfiles -VmName $VmName
 
-    Remove-TunnelServers
-    Remove-TunnelSite
-    Remove-TunnelConfiguration
+    Remove-TunnelServers -SiteName $VmName
+    Remove-TunnelSite -SiteName $VmName
+    Remove-TunnelConfiguration -ServerConfigurationName $VmName
     Logout
 }
 
@@ -391,32 +304,15 @@ Function New-ProfilesOnlyEnvironment {
     Logout
 }
 
-Function New-NewTunnelEnvironment {
-    # Initialize all variables
-    Initialize
-    # Test pre-reqs
-    Test-Prerequisites
-    # Login
-    Login
-    Initialize-Variables
-    # Create VMs
-    $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
-    $TunnelVM = New-TunnelVM -VmName $VmName -Image $Image
-    $ServiceVM = New-ServiceVM -VmName $VmName
-
-    if (-Not $Simple) {
-        New-AdvancedNetworkRules
-    } else {
-        New-NetworkRules
-    }
-}
-
 # Import functions from dependent files
 . ./scripts/TunnelAzure.ps1
 . ./scripts/TunnelHelpers.ps1
 . ./scripts/TunnelProfiles.ps1
 . ./scripts/TunnelProxy.ps1
 . ./scripts/TunnelSetup.ps1
+
+Test-Prerequisites
+Initialize
 
 if ($ProfilesOnly) {
     New-ProfilesOnlyEnvironment

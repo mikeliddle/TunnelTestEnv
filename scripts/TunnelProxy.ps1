@@ -20,6 +20,7 @@ Function Get-ProxyPrivateIP {
         [string] $VmName,
         [string] $ResourceGroup = "$VmName-group"
     )
+
     return az vm list-ip-addresses --resource-group $ResourceGroup --name $VmName --query '[0].virtualMachine.network.privateIpAddresses[0]' | ConvertFrom-Json
 }
 
@@ -75,6 +76,4 @@ Function Invoke-ProxyScript {
     Write-Header "Connecting into remote server..."
     ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
 }
-
-Export-ModuleMember -Function New-ProxyVM, Get-ProxyPrivateIP, Initialize-Proxy, Invoke-ProxyScript
 #endregion Proxy Functions

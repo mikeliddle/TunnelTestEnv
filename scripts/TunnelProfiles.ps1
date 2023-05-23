@@ -22,7 +22,6 @@ Function Login-Graph {
     # Switch to beta since most of our endpoints are there
     Select-MgProfile -Name "beta"    
 }
-Export-ModuleMember -Function Login-Graph
 #endregion Graph Functions
 
 #region Tunnel Server Profiles
@@ -33,7 +32,8 @@ Function New-TunnelConfiguration {
         [string[]] $DnsServers = @("8.8.8.8"),
         [string] $Subnet = "169.254.0.0/16",
         [string[]] $IncludeRoutes = @(),
-        [string[]] $ExcludeRoutes = @()
+        [string[]] $ExcludeRoutes = @(),
+        [string] $DefaultDomainSuffix = ""
     )
 
     Write-Header "Creating Server Configuration..."
@@ -42,7 +42,7 @@ Function New-TunnelConfiguration {
         Write-Host "Already found Server Configuration named '$ServerConfigurationName'"
     }
     else {
-        $ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $ServerConfigurationName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Subnet -AdvancedSettings @() -DefaultDomainSuffix "" -RoleScopeTagIds @("0") -RouteExcludes $ExcludeRoutes -RouteIncludes $IncludeRoutes -SplitDns @()    
+        $ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $ServerConfigurationName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Subnet -AdvancedSettings @() -DefaultDomainSuffix $DefaultDomainSuffix -RoleScopeTagIds @("0") -RouteExcludes $ExcludeRoutes -RouteIncludes $IncludeRoutes -SplitDns @()    
     }
 
     return $ServerConfiguration
@@ -100,23 +100,6 @@ Function Remove-TunnelSite {
     }
 }
 
-Function New-TunnelAgent {
-    param(
-        [string] $RunningOS,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
-        [pscredential] $TenantCredential
-    )
-
-    if (-Not $TenantCredential) {
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
-    }
-    else {
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
-    }
-
-    return $JWT
-}
-
 Function Remove-TunnelServers {
     param(
         [string] $SiteName
@@ -159,11 +142,6 @@ Function Update-PrivateDNSAddress {
     Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
     return Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
 }
-
-Export-ModuleMember -Function New-TunnelConfiguration, New-TunnelSite, New-TunnelAgent
-Export-ModuleMember -Function Remove-TunnelConfiguration, Remove-TunnelSite, Remove-TunnelServers
-Export-ModuleMember -Function Update-PrivateDNSAddress
-
 #endregion Tunnel Server Profiles
 
 #region iOS MAM Specific Functions
@@ -284,8 +262,6 @@ CONFIGURED_CLIENT_ID = $($AppId)
 "@
     Set-Content -Path "./Generated.xcconfig" -Value $Content -Force
 }
-
-Export-ModuleMember -Function Update-ADApplication, New-GeneratedXCConfig
 #endregion iOS MAM Specific Functions
 
 #region Create iOS Functions
@@ -501,7 +477,7 @@ Function New-IosAppConfigurationPolicy {
                     name  = "com.microsoft.tunnel.proxy_pacurl"
                     value = $PACUrl
                 })
-        } elif ($ProxyHostname -ne "") {
+        } elseif ($ProxyHostname -ne "") {
             $customSettings += @( @{
                     name  = "com.microsoft.tunnel.proxy_address"
                     value = $ProxyHostname
@@ -550,8 +526,6 @@ Function New-IosAppConfigurationPolicy {
     
     return $IosAppConfigurationPolicy
 }
-
-Export-ModuleMember -Function New-IosAppProtectionPolicy, New-IosTrustedRootPolicy, New-IosDeviceConfigurationPolicy, New-IosAppConfigurationPolicy
 #endregion Create iOS Functions
 
 #region Create Android Functions
@@ -810,7 +784,7 @@ Function New-AndroidAppConfigurationPolicy {
                     name  = "com.microsoft.tunnel.proxy_pacurl"
                     value = $PACUrl
                 })
-        } elif ($ProxyHostname -ne "") {
+        } elseif ($ProxyHostname -ne "") {
             $customSettings += @( @{
                     name  = "com.microsoft.tunnel.proxy_address"
                     value = $ProxyHostname
@@ -1079,6 +1053,4 @@ Function Remove-AndroidProfiles {
     Remove-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP"
     Remove-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR"
 }
-
-Export-ModuleMember -Function New-IosProfiles, Remove-IosProfiles, New-AndroidProfiles, Remove-AndroidProfiles
 #endregion Scenario Functions
