@@ -12,7 +12,7 @@ Function New-ProxyVM {
     )
 
     Write-Header "Creating VM '$VmName'..."
-    return az vm create --location $location --resource-group $ResourceGroup --name $VmName --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-Username $Username --only-show-errors | ConvertFrom-Json
+    return az vm create --location $location --resource-group $ResourceGroup --name $VmName --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
 }
 
 Function Get-ProxyPrivateIP {

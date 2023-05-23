@@ -38,7 +38,7 @@ Function New-ADDCVM {
     
     Write-Header "Creating VM '$winName'..."
 
-    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --admin-Username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
+    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
 `
     # Install AD DS role on the first VM and promote it to a domain controller
     az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"

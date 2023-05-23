@@ -78,7 +78,7 @@ Function New-TunnelVM {
     )
     
     Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-Username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
 
     Write-Host "DNS is '$($vmdata.fqdns)'"
     return $vmdata
@@ -129,7 +129,7 @@ Function New-ServiceVM {
     )
     
     Write-Header "Creating VM '$VmName-server'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name "$VmName-server" --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-server" --admin-Username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name "$VmName-server" --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-server" --admin-username $Username --only-show-errors | ConvertFrom-Json
 
     Write-Host "DNS is '$($vmdata.fqdns)'"
     return $vmdata
