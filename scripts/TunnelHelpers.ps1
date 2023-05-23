@@ -11,38 +11,38 @@ Function Write-Warning([string]$Message) {
 }
 Function New-SSHKeys {
     param(
-        [string] $SshKeyPath
+        [string] $SSHKeyPath
     )
     Write-Header "Generating new RSA 4096 SSH Key"
-    ssh-keygen -t rsa -b 4096 -f $SshKeyPath -q -N ""
+    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
 }
 
 Function Move-SSHKeys {
     param(
-        [string] $SshKeyPath
+        [string] $SSHKeyPath
     )
     Write-Header "Moving generated SSH keys..."
-    Move-Item -Path ~/.ssh/id_rsa -Destination $SshKeyPath -Force
-    Move-Item -Path ~/.ssh/id_rsa.pub -Destination $SshKeyPath.pub -Force    
+    Move-Item -Path ~/.ssh/id_rsa -Destination $SSHKeyPath -Force
+    Move-Item -Path ~/.ssh/id_rsa.pub -Destination $SSHKeyPath.pub -Force    
 }
 
 Function Remove-SSHKeys {
     param(
-        [string] $SshKeyPath
+        [string] $SSHKeyPath
     )
     Write-Header "Deleting SSH keys..."
-    if (Test-Path $SshKeyPath) {
-        Remove-Item -Path $SshKeyPath -Force
+    if (Test-Path $SSHKeyPath) {
+        Remove-Item -Path $SSHKeyPath -Force
     }
     else {
-        Write-Host "Key at path '$SshKeyPath' does not exist."
+        Write-Host "Key at path '$SSHKeyPath' does not exist."
     }
 
-    if (Test-Path "$SshKeyPath.pub") {
-        Remove-Item -Path "$SshKeyPath.pub" -Force 
+    if (Test-Path "$SSHKeyPath.pub") {
+        Remove-Item -Path "$SSHKeyPath.pub" -Force 
     }
     else {
-        Write-Host "Key at path '$SshKeyPath.pub' does not exist."
+        Write-Host "Key at path '$SSHKeyPath.pub' does not exist."
     }
 }
 

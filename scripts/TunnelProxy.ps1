@@ -12,7 +12,7 @@ Function New-ProxyVM {
     )
 
     Write-Header "Creating VM '$VmName'..."
-    return az vm create --location $location --resource-group $ResourceGroup --name $VmName --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+    return az vm create --location $location --resource-group $ResourceGroup --name $VmName --image $Image --size $ProxySize --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-Username $Username --only-show-errors | ConvertFrom-Json
 }
 
 Function Get-ProxyPrivateIP {
@@ -57,14 +57,14 @@ Function Initialize-Proxy {
 
     Write-Header "Copying proxy script to remote server..."
 
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
-    scp -i $sshKeyPath -o "StrictHostKeyChecking=no" "$pacFile.tmp" "$($username)@$("$TunnelServer"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile.tmp" "$($Username)@$("$TunnelServer"):~/" > $null
 
     Write-Header "Marking proxy scripts as executable..."
-    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
 }
 
 Function Invoke-ProxyScript {
@@ -74,6 +74,6 @@ Function Invoke-ProxyScript {
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName"
     )
     Write-Header "Connecting into remote server..."
-    ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
 }
 #endregion Proxy Functions

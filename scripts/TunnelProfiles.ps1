@@ -9,7 +9,7 @@ Function Login-Graph {
         Write-Header "Select the account to manage the profiles."
         $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
     } else {
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.UserName) $($TenantCredential.GetNetworkCredential().Password)"
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.Username) $($TenantCredential.GetNetworkCredential().Password)"
     }
     
     if (-Not $JWT) {
@@ -125,17 +125,17 @@ Function Update-PrivateDNSAddress {
     param(
         [string] $FQDN,
         [string] $VmUsername,
-        [string] $sshKeyPath,
+        [string] $SSHKeyPath,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
     )
 
     Write-Header "Updating server configuration private DNS..."
 
     if ($Image.Contains("RHEL")) {
-        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
+        $DNSPrivateAddress = ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
     }
     else {
-        $DNSPrivateAddress = ssh -i $sshKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
+        $DNSPrivateAddress = ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
     }
 
     $newServers = $DNSPrivateAddress
@@ -385,7 +385,7 @@ Function New-IosDeviceConfigurationPolicy {
             displayName           = $DisplayName
             id                    = [System.Guid]::Empty.ToString()
             roleScopeTagIds       = @("0")
-            authenticationMethod  = "usernameAndPassword"
+            authenticationMethod  = "UsernameAndPassword"
             connectionType        = "microsoftTunnel"
             connectionName        = $DisplayName
             microsoftTunnelSiteId = $Site.Id

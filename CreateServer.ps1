@@ -246,21 +246,28 @@ Function New-TunnelEnvironment {
     }
     
     if (!$NoProxy) {
+        # Setup Proxy server on Service VM
         Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name
         Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath
     }
 
+    # Create Certificates
+    New-BasicPki -ServiceVMDNS $ServiceVM.fqdns -TunnelVMDNS $TunnelVm.fqdns -Username $Username -SSHKeyPath $SSHKeyPath
+
+    exit
+
+    # Create Tunnel Configuration
     $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns
     $TunnelSite = New-TunnelSite -SiteName $VmName -FQDN $TunnelVM.fqdns -ServerConfiguration $ServerConfiguration
 
+    # Enroll Tunnel Agent
     New-TunnelAgent -RunningOS $RunningOS -Site $TunnelSite -TenantCredential $TenantCredential
 
-    Initialize-SetupScript -FQDN $TunnelVm.fqdns -Environment $Environment -NoProxy $NoProxy -UseEnterpriseCa $UseEnterpriseCa -Email $Email -Site $TunnelSite -Username $Username
-    Invoke-SetupScript -sshKeyPath $SSHKeyPath -Username $Username -FQDN $TunnelVm.fqdns
+    Initialize-TunnelServer -FQDN $TunnelVm.fqdns -SiteId $TunnelSite.Id -SSHKeyPath $SSHKeyPath -Username $Username
+    Initialize-SetupScript -FQDN $TunnelVm.fqdns -Environment $Environment -NoProxy $NoProxy -NoPki $NoPki -Email $Email -Site $TunnelSite -Username $Username
+    Invoke-SetupScript -SSHKeyPath $SSHKeyPath -Username $Username -FQDN $TunnelVm.fqdns
 
-    Update-PrivateDNSAddress -FQDN $TunnelVm.fqdns -VmUsername $Username -sshKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration
-    
-    exit
+    Update-PrivateDNSAddress -FQDN $TunnelVm.fqdns -VmUsername $Username -SSHKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration
 
     Update-ADApplication
     New-GeneratedXCConfig
@@ -276,7 +283,7 @@ Function Remove-TunnelEnvironment {
     Initialize-Variables
     
     Remove-ResourceGroup -resourceGroup "$VmName-group"
-    Remove-SSHKeys -sshKeyPath "$HOME/.ssh/$VmName"
+    Remove-SSHKeys -SSHKeyPath "$HOME/.ssh/$VmName"
 
     Remove-IosProfiles -VmName $VmName
     Remove-AndroidProfiles -VmName $VmName
@@ -310,6 +317,7 @@ Function New-ProfilesOnlyEnvironment {
 . ./scripts/TunnelProfiles.ps1
 . ./scripts/TunnelProxy.ps1
 . ./scripts/TunnelSetup.ps1
+. ./scripts/SetupServices.ps1
 
 Test-Prerequisites
 Initialize

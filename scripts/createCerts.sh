@@ -122,6 +122,9 @@ CreateServerCert() {
     touch certs/serverchain.pem
     cat certs/intermediate.pem | sed -n "/-----BEGIN CERTIFICATE-----/,/t-----END CERTIFICATE-----/p" > certs/intermediate-trimmed.pem
     cat certs/server.pem certs/intermediate-trimmed.pem certs/cacert.pem > certs/serverchain.pem
+    
+    cp certs/serverchain.pem ~/serverchain.pem
+    cp private/server.key  ~/server.key
 
     openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -certfile certs/serverchain.pem -passout pass: >> certs.log 2>&1
     
