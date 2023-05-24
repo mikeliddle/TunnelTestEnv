@@ -27,10 +27,18 @@ Function New-NginxSetup {
     )
 
     Write-Header "Configuring Nginx..."
+    $Content = Get-Content ./nginx.conf.d/nginx.conf
+    $Content = $Content -replace "##DOMAIN_NAME##", "$ServiceVMDNS"
+    $Content = $Content -replace "##SERVER_NAME##", "$($ServiceVMDNS.split('.')[0])"
+    Set-Content -Path ./nginx.conf.d/nginx.conf.tmp -Value $Content -Force
+
+    Write-Header "Copying files over"
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/createWebservers.sh "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx.conf.d "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx_data "$($Username)@$($ServiceVMDNS):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./sampleWebService "$($Username)@$($ServiceVMDNS):~/" > $null
 
+    Write-Header "Install and run Containers"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/createWebservers.sh"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a -d $ServiceVMDNS -e $Email"
 }

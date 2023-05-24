@@ -28,11 +28,13 @@ SetupPrereqs() {
         update_command="apt-get update"
         ctr_cli="docker"
         ctr_package_name="docker.io"
+        network_name="bridge"
     else
         installer="yum"
         update_command="yum update"
         ctr_cli="podman"
         ctr_package_name="@container-tools"
+        network_name="podman"
 
         # need to allow 443 inbound for webservers to do HTTPS.
         firewall-cmd --zone=public --add-port=443/tcp
@@ -66,6 +68,8 @@ SetupNginx() {
     LogInfo "Setting up private web server container"
     # create volume
     $ctr_cli volume create nginx-vol > nginx.log
+
+    mv nginx.conf.d/nginx.conf.tmp nginx.conf.d/nginx.conf
 
 	# run the containers on the $ctr_cli subnet
 	$ctr_cli run -d \
