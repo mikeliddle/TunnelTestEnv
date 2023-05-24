@@ -1,3 +1,5 @@
+#!/bin/bash
+
 LogInfo() {
     echo -e "\e[0;36m$1\e[0m"
 }
@@ -82,12 +84,13 @@ AddARecord() {
         exit 1
     fi
 
-    record=$(echo $template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")
+    record="$(echo $template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")"
     record="$record\n$template"
-    ptr_record=$(echo $ptr_template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")
+    ptr_record="$(echo $ptr_template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")"
     prt_record="$ptr_record\n$ptr_template"
 
-    sed -e "s/$template/$record/" -e "s/$ptr_template/$ptr_record/" a-records.conf
+    sed -i "s/$template/$record/" a-records.conf
+    sed -i "s/$ptr_template/$ptr_record/" a-records.conf
 
     $ctr_cli cp a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> unbound.log 2>&1

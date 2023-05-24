@@ -32,7 +32,7 @@ Function New-NginxSetup {
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx_data "$($Username)@$($ServiceVMDNS):~/" > $null
 
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/createWebservers.sh"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a -d $VmName -e $Email"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a -d $ServiceVMDNS -e $Email"
 }
 
 Function New-DnsServer {
@@ -53,8 +53,8 @@ Function New-DnsServer {
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/configureDNS.sh"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh"
 
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d proxy.$VmName"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d trusted.$VmName"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d untrusted.$VmName"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d webapp.$VmName"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d proxy.$ServiceVMDNS"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d trusted.$ServiceVMDNS"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d untrusted.$ServiceVMDNS"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d webapp.$ServiceVMDNS"
 }

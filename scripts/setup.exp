@@ -11,10 +11,10 @@ if {$force_conservative} {
 }
 
 set timeout -1
-spawn ./createTunnel.sh ##ARGS##
+spawn ./createTunnel.sh -c ./fullchain.pem -k ./fullchain.key
 match_max 100000
 expect -exact "Enter Site ID to join : "
-send -- "##SITE_ID##"
-expect -exact "##SITE_ID##"
+send -- "ed906139-018e-4f67-9e5b-d710e4c0a9f2"
+expect -exact "ed906139-018e-4f67-9e5b-d710e4c0a9f2"
 send -- "\r"
 expect eof

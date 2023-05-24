@@ -51,9 +51,9 @@ SetupPrereqs() {
         fi
     fi
 
-    if [ ! -d "acme.sh"]; then
+    if [ ! -d ./acme.sh ]; then
         LogInfo "Installing acme.sh"
-        curl https://get.acme.sh | sh >> install.log 2>&1
+        curl https://get.acme.sh | sh -s email=$EMAIL >> install.log 2>&1
 
         if [ $? -ne 0 ]; then
             LogError "Failed to install acme.sh"
@@ -147,18 +147,7 @@ SetupWebApps() {
 }
 
 SetupAcmesh() {
-    cd acme.sh
-    
-	./acme.sh --install -m $EMAIL >> install.log
-	
-    if [ $? -ne 0 ]; then
-        LogError "acme.sh not properly setup... aborting"
-        cd ..
-        exit 1
-    fi
-
-    cd ..
-
+    current_dir=$(pwd)
     ~/.acme.sh/acme.sh --upgrade  >> certs.log 2>&1
     ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt  >> certs.log 2>&1
     ~/.acme.sh/acme.sh --register-account  >> certs.log 2>&1
@@ -167,13 +156,16 @@ SetupAcmesh() {
 
     ~/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1" --keylength 4096  >> certs.log 2>&1
 
-    cp ~/.acme.sh/$DOMAIN_NAME/fullchain.cer certs/letsencrypt.pem  >> certs.log 2>&1
-    cp ~/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key private/letsencrypt.key  >> certs.log 2>&1
+    cp ~/.acme.sh/$DOMAIN_NAME/fullchain.cer /etc/pki/tls/certs/letsencrypt.pem  >> certs.log 2>&1
+    cp ~/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key /etc/pki/tls/private/letsencrypt.key  >> certs.log 2>&1
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup LetsEncrypt cert"
+        cd $current_dir
         exit 1
     fi
+
+    cd $current_dir
 }
 
 while getopts ":awnd:e:" opt; do

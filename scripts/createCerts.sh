@@ -125,6 +125,8 @@ CreateServerCert() {
     
     cp certs/serverchain.pem /home/azureuser/serverchain.pem
     cp private/server.key  /home/azureuser/server.key
+    chmod 777 /home/azureuser/serverchain.pem
+    chmod 777 /home/azureuser/server.key
 
     openssl pkcs12 -export -out private/server.pfx -inkey private/server.key -in certs/server.pem -certfile certs/serverchain.pem -passout pass: >> certs.log 2>&1
     
