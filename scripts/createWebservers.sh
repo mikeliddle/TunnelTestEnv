@@ -23,7 +23,7 @@ Usage() {
 SetupPrereqs() {
     LogInfo "Detecting OS"
 
-    if [ -f "/etc/debian_version" ]; the
+    if [ -f "/etc/debian_version" ]; then
         installer="apt-get"
         update_command="apt-get update"
         ctr_cli="docker"

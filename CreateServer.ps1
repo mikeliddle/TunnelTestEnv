@@ -254,7 +254,10 @@ Function New-TunnelEnvironment {
     # Create Certificates
     New-BasicPki -ServiceVMDNS $ServiceVM.fqdns -TunnelVMDNS $TunnelVm.fqdns -Username $Username -SSHKeyPath $SSHKeyPath
 
-    exit
+    # Setup DNS
+    New-DnsServer -TunnelVMDNS $TunnelVM.fqdns -ProxyIP $ProxyIP -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns
+    # Setup WebServers
+    New-NginxSetup -TunnelVMDNS $TunnelVM.fqdns -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns -Email $Email
 
     # Create Tunnel Configuration
     $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns

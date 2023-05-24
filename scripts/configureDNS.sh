@@ -25,7 +25,7 @@ Usage() {
 SetupPrereqs() {
     LogInfo "Detecting OS"
 
-    if [ -f "/etc/debian_version" ]; the
+    if [ -f "/etc/debian_version" ]; then
         installer="apt-get"
         update_command="apt-get update"
         ctr_cli="docker"
@@ -89,7 +89,7 @@ AddARecord() {
 
     sed -e "s/$template/$record/" -e "s/$ptr_template/$ptr_record/" a-records.conf
 
-    $ctr_cli cp a-records.conf unbound:/etc/unbound/unbound.conf.d/a-records.conf
+    $ctr_cli cp a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
     $ctr_cli restart unbound >> unbound.log 2>&1
 }
 
@@ -108,8 +108,8 @@ SetupUnbound() {
         docker.io/mvance/unbound:latest >> unbound.log 2>&1
 
     # copy in necessary config files
-    $ctr_cli cp unbound.conf.d/a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
-    $ctr_cli cp unbound.conf.d/unbound.conf unbound:/opt/unbound/etc/unbound/unbound.conf
+    $ctr_cli cp a-records.conf unbound:/opt/unbound/etc/unbound/a-records.conf
+    $ctr_cli cp unbound.conf unbound:/opt/unbound/etc/unbound/unbound.conf
     # restart to apply config change
     $ctr_cli restart unbound >> unbound.log 2>&1
 
@@ -144,7 +144,7 @@ done
 
 SetupPrereqs
 
-if [[ $Update ]]; then
+if [ $Update ]; then
     AddARecord
 else
     SetupUnbound
