@@ -64,6 +64,10 @@ SetupPrereqs() {
     # recoverable, you'll need to interact though.
     cp agent-info.json /etc/mstunnel/agent-info.json > /dev/null 2>&1
     cp agent.p12 /etc/mstunnel/private/agent.p12 > /dev/null 2>&1
+
+    wget -q --output-document=mstunnel-setup https://aka.ms/microsofttunneldownload
+    [ $? -ne 0 ] && exit
+    chmod +x ./mstunnel-setup
 }
 
 InstallTunnelAppliance() {

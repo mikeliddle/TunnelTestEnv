@@ -13,8 +13,8 @@ Function New-BasicPki {
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/createCerts.sh"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createCerts.sh -risux -c `"$TunnelVMDNS`" -a `"DNS.1\=$TunnelVMDNS\nDNS.2\=*.$TunnelVMDNS\nDNS.3\=trusted\nDNS.4\=webapp\nDNS.5\=excluded`""
 
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/serverchain.pem" ./serverchain.pem > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/server.key" ./server.key > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/serverchain.pem" ./scripts/serverchain.pem.tmp > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/server.key" ./scripts/server.key.tmp > $null
 }
 
 Function New-NginxSetup {
