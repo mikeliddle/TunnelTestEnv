@@ -15,9 +15,13 @@ Function Initialize-TunnelServer {
 
     $Content = Get-Content ./scripts/setup.exp
     $Content = $Content -replace "##SITE_ID##", "$SiteId"
-    $Content = $Content -replace "##ARGS##", "-c ./fullchain.pem -k ./fullchain.key"
+    $Content = $Content -replace "##ARGS##", "-c ./serverchain.pem -k ./server.key"
     Set-Content -Path ./scripts/setup.exp -Value $Content -Force
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./setup.exp "$($Username)@$($FQDN):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup.exp "$($Username)@$($FQDN):~/" > $null
+
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/createTunnel.sh"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/setup-expect.sh"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/setup.exp"
 }
 
 Function Initialize-SetupScript {
