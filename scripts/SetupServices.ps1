@@ -18,6 +18,7 @@ Function New-BasicPki {
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/serverchain.pem" ./scripts/serverchain.pem.tmp > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/cacert.pem" ./cacert.pem.tmp > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS):~/server.key" ./scripts/server.key.tmp > $null
+
 }
 
 Function New-NginxSetup {
