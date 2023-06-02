@@ -133,7 +133,12 @@ param(
     [switch]$WithADFS,
 
     [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
-    [string]$DomainName
+    [string]$DomainName,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Int32]$ListenPort=443
 )
 
 $script:SSHKeyPath = ""
@@ -270,15 +275,21 @@ Function New-TunnelEnvironment {
     Initialize-SetupScript -FQDN $TunnelVm.fqdns -Environment $Environment -NoProxy $NoProxy -NoPki $NoPki -Email $Email -Site $TunnelSite -Username $Username
     Invoke-SetupScript -SSHKeyPath $SSHKeyPath -Username $Username -FQDN $TunnelVm.fqdns
 
-    Update-PrivateDNSAddress -FQDN $TunnelVm.fqdns -VmUsername $Username -SSHKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration
+    Update-PrivateDNSAddress -FQDN $ServiceVM.fqdns -VmUsername $Username -SSHKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration
 
-    Update-ADApplication
-    New-GeneratedXCConfig
+    $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
+    New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
 
-    New-IOSProfiles
-    New-AndroidProfiles
+    if ($Platform -eq "ios" -or $Platform -eq "all") {
+        New-IOSProfiles -VmName $VmName -certFileName ./cacert.pem.tmp -GroupId $Group.Id -PACUrl "$($ServiceVM.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+    }
+    if ($Platform -eq "android" -or $Platform -eq "all") {
+        New-AndroidProfiles -VmName $VmName -certFileName ./cacert.pem.tmp -GroupId $Group.Id -PACUrl "$($ServiceVM.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+    }
 
-    Logout
+    if (!$StayLoggedIn) {
+        Logout
+    }
 }
 
 Function Remove-TunnelEnvironment {

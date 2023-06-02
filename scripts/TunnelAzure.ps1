@@ -10,27 +10,27 @@ Function Login-Azure {
         return
     }
 
-    $accounts = az account list --only-show-errors | ConvertFrom-Json
+    $accounts = az account show --only-show-errors | ConvertFrom-Json | Out-Null
 
     if ($accounts.Count -eq 0) {
         Write-Header "Logging into Azure..."
 
         az login --only-show-errors | Out-Null
         
-        if ($SubscriptionId) {
-            Write-Header "Setting subscription to $SubscriptionId"
-            az account set --subscription $SubscriptionId | Out-Null
-        } else {
+        if (!$SubscriptionId) {
             $accounts = (az account list | ConvertFrom-Json)
             if ($accounts.Count -gt 1) {
                 foreach ($account in $accounts) {
                     Write-Host "$($account.name) - $($account.id)"
                 }
                 $SubscriptionId = Read-Host "Please specify a subscription id: "
-                Write-Header "Setting subscription to $SubscriptionId"
-                az account set --subscription $SubscriptionId | Out-Null
+            } else {
+                $SubscriptionId = $accounts[0].id
             }
         }
+
+        Write-Header "Setting subscription to $SubscriptionId"
+        az account set --subscription $SubscriptionId | Out-Null
     } else {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
         Write-Warning "If you don't want to use this account, please logout, then run this script again."

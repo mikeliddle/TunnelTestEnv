@@ -28,7 +28,7 @@ Function Login-Graph {
 Function New-TunnelConfiguration {
     param(
         [string] $ServerConfigurationName,
-        [int] $ListenPort = 443,
+        [Int32] $ListenPort = 443,
         [string[]] $DnsServers = @("8.8.8.8"),
         [string] $Subnet = "169.254.0.0/16",
         [string[]] $IncludeRoutes = @(),
@@ -152,7 +152,7 @@ Function Update-ADApplication {
         [string[]] $BundleIds
     )
     
-    $App = Get-MgApplication -Filter "displayName eq '$ADApplication'" -Limit 1
+    $App = Get-MgApplication -Filter "DisplayName eq '$ADApplication'" -Limit 1
     if ($App) {
         Write-Success "Client Id: $($App.AppId)"
         Write-Success "Tenant Id: $($TenantId)"
@@ -331,7 +331,7 @@ Function New-IosTrustedRootPolicy {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
     else {
-        $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        $certValue = (Get-Content $certFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
             "@odata.type"          = "#microsoft.graph.iosTrustedRootCertificate"
@@ -356,7 +356,7 @@ Function New-IosTrustedRootPolicy {
                 })
         }
     
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosTrustedRootPolicy.Id)/assign" -Body $Body
+        $IosTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosTrustedRootPolicy.Id)/assign" -Body $Body
     }
 
     return $IosTrustedRootPolicy
@@ -423,7 +423,7 @@ Function New-IosAppConfigurationPolicy {
         [string] $DisplayName,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfigurationPolicy] $TrustedRootPolicy,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfiguration] $TrustedRootPolicy,
         [string[]] $BundleIds,
         [string] $GroupId,
         [string] $PACUrl = "",
@@ -431,7 +431,7 @@ Function New-IosAppConfigurationPolicy {
         [string] $ProxyPort = ""
     )
 
-    $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1 | ConvertFrom-Json
     if ($IosAppConfigurationPolicy) {
         Write-Host "Already found App Configuration policy named '$DisplayName'"
     }
@@ -541,7 +541,7 @@ Function New-AndroidTrustedRootPolicy {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
     else {
-        $certValue = (Get-Content $cerFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        $certValue = (Get-Content $certFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
             "@odata.type"          = "#microsoft.graph.androidWorkProfileTrustedRootCertificate"
@@ -553,9 +553,9 @@ Function New-AndroidTrustedRootPolicy {
         } | ConvertTo-Json -Depth 10
 
         Write-Header "Creating Trusted Root Policy..."
-        AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+        $AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
         # re-fetch the policy so the root certificate is included
-        AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+        $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
         $Body = @{
             "assignments" = @(@{
@@ -566,7 +566,7 @@ Function New-AndroidTrustedRootPolicy {
                 })
         }
     
-        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($AndroidTrustedRootPolicy.Id)/assign" -Body $Body
+        $AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($AndroidTrustedRootPolicy.Id)/assign" -Body $Body
     }
     return $AndroidTrustedRootPolicy
 }
@@ -711,7 +711,7 @@ Function New-AndroidAppConfigurationPolicy {
         [string] $DisplayName,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfigurationPolicy] $TrustedRootPolicy,
+        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfiguration] $TrustedRootPolicy,
         [string[]] $BundleIds,
         [string] $GroupId,
         [string] $PACUrl = "",
@@ -992,7 +992,6 @@ Function Remove-AndroidAppConfigurationPolicy {
 #region Scenario Functions
 Function New-IosProfiles {
     param(
-        [string] $Platform,
         [string] $VmName,
         [string] $certFileName,
         [string] $GroupId,
@@ -1003,12 +1002,11 @@ Function New-IosProfiles {
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
     )
 
-    if ($Platform -eq "ios" -or $Platform -eq "all") {
-        $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
-        New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
-        New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
-        New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
-    }
+    
+    $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
+    $IosDeviceConfigurationPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+    $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+    $IosAppConfigurationPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
 }
 
 Function Remove-IosProfiles {
@@ -1024,7 +1022,6 @@ Function Remove-IosProfiles {
 
 Function New-AndroidProfiles {
     param(
-        [string] $Platform,
         [string] $VmName,
         [string] $certFileName,
         [string] $GroupId,
@@ -1035,12 +1032,10 @@ Function New-AndroidProfiles {
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
     )
 
-    if ($Platform -eq "android" -or $Platform -eq "all") {
-        $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
-        New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
-        New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
-        New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
-    }
+    $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
+    New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+    New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+    New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
 }
 
 Function Remove-AndroidProfiles {
