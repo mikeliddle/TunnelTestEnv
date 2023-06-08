@@ -185,10 +185,10 @@ Function Test-Prerequisites {
 
 Function Login {
     if (-Not $ProfilesOnly) {
-        Login-Azure
+        Login-Azure -SubscriptionId $SubscriptionId -VmTenantCredential $VmTenantCredential
     }
     
-    Login-Graph
+    Login-Graph -TenantCredential $TenantCredential
 }
 
 Function Logout {
