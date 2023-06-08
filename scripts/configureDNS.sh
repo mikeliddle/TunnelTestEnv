@@ -85,8 +85,10 @@ AddARecord() {
     fi
 
     record="$(echo $template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")"
+    record="$(echo $record | sed -e "s/#//")"
     record="$record\n$template"
     ptr_record="$(echo $ptr_template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")"
+    ptr_record="$(echo $ptr_record | sed -e "s/#//")"
     prt_record="$ptr_record\n$ptr_template"
 
     sed -i "s/$template/$record/" a-records.conf

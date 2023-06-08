@@ -126,20 +126,13 @@ Function Update-PrivateDNSAddress {
         [string] $FQDN,
         [string] $VmUsername,
         [string] $SSHKeyPath,
+        [string] $DNSPrivateAddress,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
     )
 
     Write-Header "Updating server configuration private DNS..."
 
-    if ($Image.Contains("RHEL")) {
-        $DNSPrivateAddress = ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo podman container inspect -f "{{ .NetworkSettings.Networks.podman.IPAddress }}" unbound'
-    }
-    else {
-        $DNSPrivateAddress = ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($VmUsername)@$($FQDN)" 'sudo docker container inspect -f "{{ .NetworkSettings.Networks.bridge.IPAddress }}" unbound'
-    }
-
-    $newServers = $DNSPrivateAddress
-    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $newServers -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $DNSPrivateAddress -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
     return Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
 }
 #endregion Tunnel Server Profiles
@@ -344,6 +337,7 @@ Function New-IosTrustedRootPolicy {
 
         Write-Header "Creating Trusted Root Policy..."
         $IosTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+
         # re-fetch the policy so the root certificate is included
         $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
         
@@ -356,7 +350,7 @@ Function New-IosTrustedRootPolicy {
                 })
         }
     
-        $IosTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosTrustedRootPolicy.Id)/assign" -Body $Body
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosTrustedRootPolicy.Id)/assign" -Body $Body
     }
 
     return $IosTrustedRootPolicy
@@ -423,13 +417,15 @@ Function New-IosAppConfigurationPolicy {
         [string] $DisplayName,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfiguration] $TrustedRootPolicy,
+        [Microsoft.Graph.PowerShell.Models.MicrosoftGraphDeviceConfiguration1] $TrustedRootPolicy,
         [string[]] $BundleIds,
         [string] $GroupId,
         [string] $PACUrl = "",
         [string] $ProxyHostname = "",
         [string] $ProxyPort = ""
     )
+
+    Write-Header $TrustedRootPolicy
 
     $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1 | ConvertFrom-Json
     if ($IosAppConfigurationPolicy) {
@@ -462,11 +458,11 @@ Function New-IosAppConfigurationPolicy {
                 name  = "com.microsoft.tunnel.trusted_root_certificates"
                 value = (@(
                         @{
-                            "@odata.type"          = $IosTrustedRootPolicy.AdditionalProperties."@odata.type"
-                            id                     = $IosTrustedRootPolicy.Id
-                            displayName            = $IosTrustedRootPolicy.DisplayName
-                            lastModifiedDateTime   = $IosTrustedRootPolicy.LastModifiedDateTime
-                            trustedRootCertificate = $IosTrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                            "@odata.type"          = $TrustedRootPolicy.AdditionalProperties."@odata.type"
+                            id                     = $TrustedRootPolicy.Id
+                            displayName            = $TrustedRootPolicy.DisplayName
+                            lastModifiedDateTime   = $TrustedRootPolicy.LastModifiedDateTime
+                            trustedRootCertificate = $TrustedRootPolicy.AdditionalProperties.trustedRootCertificate
                         }
                     ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
             }
@@ -769,11 +765,11 @@ Function New-AndroidAppConfigurationPolicy {
                 name  = "com.microsoft.tunnel.trusted_root_certificates"
                 value = (@(
                         @{
-                            "@odata.type"          = $AndroidTrustedRootPolicy.AdditionalProperties."@odata.type"
-                            id                     = $AndroidTrustedRootPolicy.Id
-                            displayName            = $AndroidTrustedRootPolicy.DisplayName
-                            lastModifiedDateTime   = $AndroidTrustedRootPolicy.LastModifiedDateTime
-                            trustedRootCertificate = $AndroidTrustedRootPolicy.AdditionalProperties.trustedRootCertificate
+                            "@odata.type"          = $TrustedRootPolicy.AdditionalProperties."@odata.type"
+                            id                     = $TrustedRootPolicy.Id
+                            displayName            = $TrustedRootPolicy.DisplayName
+                            lastModifiedDateTime   = $TrustedRootPolicy.LastModifiedDateTime
+                            trustedRootCertificate = $TrustedRootPolicy.AdditionalProperties.trustedRootCertificate
                         }
                     ) | ConvertTo-Json -Depth 10 -Compress -AsArray)
             }
@@ -1004,9 +1000,13 @@ Function New-IosProfiles {
 
     
     $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
+    Write-Header $IosTrustedRootPolicy
     $IosDeviceConfigurationPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+    Write-Header $IosDeviceConfigurationPolicy
     $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+    Write-Header $IosAppProtectionPolicy
     $IosAppConfigurationPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+    Write-Header $IosAppConfigurationPolicy
 }
 
 Function Remove-IosProfiles {
@@ -1033,9 +1033,9 @@ Function New-AndroidProfiles {
     )
 
     $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
-    New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
-    New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
-    New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+    $AndroidDeviceConfigurationPolicy = New-AndroidDeviceConfigurationPolicy -DisplayName "android-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
+    $AndroidAppProtectionPolicy = New-AndroidAppProtectionPolicy -DisplayName "android-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
+    $AndroidAppConfigurationPolicy = New-AndroidAppConfigurationPolicy -DisplayName "android-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
 }
 
 Function Remove-AndroidProfiles {
