@@ -351,6 +351,8 @@ Function New-IosTrustedRootPolicy {
         }
     
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($IosTrustedRootPolicy.Id)/assign" -Body $Body
+
+        return $IosTrustedRootPolicy
     }
 
     return $IosTrustedRootPolicy
@@ -417,15 +419,13 @@ Function New-IosAppConfigurationPolicy {
         [string] $DisplayName,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
-        [Microsoft.Graph.PowerShell.Models.MicrosoftGraphDeviceConfiguration1] $TrustedRootPolicy,
+        $TrustedRootPolicy,
         [string[]] $BundleIds,
         [string] $GroupId,
         [string] $PACUrl = "",
         [string] $ProxyHostname = "",
         [string] $ProxyPort = ""
     )
-
-    Write-Header $TrustedRootPolicy
 
     $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1 | ConvertFrom-Json
     if ($IosAppConfigurationPolicy) {
@@ -533,6 +533,7 @@ Function New-AndroidTrustedRootPolicy {
     )
 
     $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+
     if ($AndroidTrustedRootPolicy) {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
@@ -550,6 +551,7 @@ Function New-AndroidTrustedRootPolicy {
 
         Write-Header "Creating Trusted Root Policy..."
         $AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
+
         # re-fetch the policy so the root certificate is included
         $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
@@ -562,8 +564,9 @@ Function New-AndroidTrustedRootPolicy {
                 })
         }
     
-        $AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($AndroidTrustedRootPolicy.Id)/assign" -Body $Body
+        Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations/$($AndroidTrustedRootPolicy.Id)/assign" -Body $Body
     }
+
     return $AndroidTrustedRootPolicy
 }
 
@@ -707,7 +710,7 @@ Function New-AndroidAppConfigurationPolicy {
         [string] $DisplayName,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphDeviceConfiguration] $TrustedRootPolicy,
+        $TrustedRootPolicy,
         [string[]] $BundleIds,
         [string] $GroupId,
         [string] $PACUrl = "",
@@ -998,15 +1001,10 @@ Function New-IosProfiles {
         [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
     )
 
-    
-    $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
-    Write-Header $IosTrustedRootPolicy
     $IosDeviceConfigurationPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$VmName-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Site -ServerConfiguration $ServerConfiguration
-    Write-Header $IosDeviceConfigurationPolicy
     $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$VmName-APP" -GroupId $GroupId -BundleIds $BundleIds
-    Write-Header $IosAppProtectionPolicy
+    $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$VmName-TR" -certFileName $certFileName -GroupId $GroupId
     $IosAppConfigurationPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$VmName-appconfig" -GroupId $GroupId -Site $Site -ServerConfiguration $ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
-    Write-Header $IosAppConfigurationPolicy
 }
 
 Function Remove-IosProfiles {

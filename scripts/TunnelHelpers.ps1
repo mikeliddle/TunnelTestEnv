@@ -15,12 +15,7 @@ Function New-SSHKeys {
     )
     Write-Header "Generating new RSA 4096 SSH Key"
     
-    if ($IsWindows) {
-        ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N '""'
-    } else {
-        ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
-    }
-    
+    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
 }
 
 Function Move-SSHKeys {
