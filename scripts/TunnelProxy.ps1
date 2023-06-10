@@ -42,9 +42,13 @@ Function Initialize-Proxy {
     (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$configFile.tmp"
     (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
 
+    $ProxyURL = "$($ProxyVMData.fqdns):3128"
+    (Get-Content $pacFile) -replace "##PROXY_URL##", "$ProxyURL" | out-file "$pacFile.tmp"
+    $pacFile = "$pacFile.tmp"
+
     $proxyBypassNames = ("www.google.com", "excluded.$($TunnelServer)")
     foreach ($name in $proxyBypassNames) {
-        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile.tmp"
+        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile"
     }
 
     # Replace CR+LF with LF
@@ -61,7 +65,7 @@ Function Initialize-Proxy {
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile.tmp" "$($Username)@$("$TunnelServer"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$ProxyVMData"):~/" > $null
 
     Write-Header "Marking proxy scripts as executable..."
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"

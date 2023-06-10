@@ -281,10 +281,10 @@ Function New-TunnelEnvironment {
     New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
 
     if ($Platform -eq "ios" -or $Platform -eq "all") {
-        New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "$($ServiceVM.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
     }
     if ($Platform -eq "android" -or $Platform -eq "all") {
-        New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "$($ServiceVM.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
     }
 
     if (!$StayLoggedIn) {
