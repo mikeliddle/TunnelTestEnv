@@ -277,6 +277,8 @@ Function New-TunnelEnvironment {
 
     Update-RebootVM -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
 
+    Update-RebootVM -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+
     # Create Tunnel Configuration
     $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns
     $TunnelSite = New-TunnelSite -SiteName $VmName -FQDN $TunnelVM.fqdns -ServerConfiguration $ServerConfiguration
