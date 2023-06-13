@@ -45,7 +45,7 @@ SetupPrereqs() {
         ctr_cli="podman"
         ctr_package_name="@container-tools"
 
-        # need to allow 443 inbound for webservers to do HTTPS.
+        # need to allow 53 inbound for webservers to do DNS.
         firewall-cmd --zone=public --add-port=53/tcp
         firewall-cmd --zone=public --add-port=53/udp
         firewall-cmd --zone=public --permanent --add-port=53/tcp
