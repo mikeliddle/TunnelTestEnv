@@ -32,8 +32,8 @@ Function New-NginxSetup {
 
     Write-Header "Configuring Nginx..."
     $Content = Get-Content ./nginx.conf.d/nginx.conf
-    $Content = $Content -replace "##DOMAIN_NAME##", "$ServiceVMDNS"
-    $Content = $Content -replace "##SERVER_NAME##", "$($ServiceVMDNS.split('.')[0])"
+    $Content = $Content -replace "##DOMAIN_NAME##", "$TunnelVMDNS"
+    $Content = $Content -replace "##SERVER_NAME##", "$($TunnelVMDNS.split('.')[0])"
     Set-Content -Path ./nginx.conf.d/nginx.conf.tmp -Value $Content -Force
 
     Write-Header "Copying files over"
@@ -70,4 +70,5 @@ Function New-DnsServer {
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d trusted.$TunnelVMDNS"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d untrusted.$TunnelVMDNS"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d webapp.$TunnelVMDNS"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./configureDNS.sh -u -i $ProxyIP -d excluded.$TunnelVMDNS"
 }

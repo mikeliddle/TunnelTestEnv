@@ -42,7 +42,7 @@ Function Initialize-Proxy {
     (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$configFile.tmp"
     (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
 
-    $ProxyURL = "$($ProxyVMData.fqdns):3128"
+    $ProxyURL = "$($ProxyVMData.fqdns)"
     (Get-Content $pacFile) -replace "##PROXY_URL##", "$ProxyURL" | out-file "$pacFile.tmp"
     $pacFile = "$pacFile.tmp"
 

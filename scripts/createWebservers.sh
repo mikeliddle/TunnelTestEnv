@@ -75,6 +75,7 @@ SetupNginx() {
 	# run the containers on the $ctr_cli subnet
 	$ctr_cli run -d \
         -p 443:443 \
+        -p 80:80 \
         --mount type=volume,source=nginx-vol,dst=/etc/volume \
 		--name=nginx \
 		--restart=unless-stopped \
@@ -109,7 +110,7 @@ SetupWebApps() {
     $ctr_cli run -d \
         --name=webApp \
         --restart=unless-stopped \
-        -p 80:80 \
+        -p 8081:80 \
         -p 8443:443 \
         -e ASPNETCORE_URLS="https://+;http://+" \
         -e ASPNETCORE_HTTPS_PORT=443 \
