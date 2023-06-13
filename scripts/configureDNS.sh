@@ -37,6 +37,7 @@ SetupPrereqs() {
         sed -i "s/#DNS=/DNS=1.1.1.1/g" /etc/systemd/resolved.conf
         sed -i "s/#DNSStubListener=yes/DNSStubListener=no/g" /etc/systemd/resolved.conf
         ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+        systemctl disable systemd-resolved
         systemctl stop systemd-resolved
     else
         installer="yum"

@@ -70,6 +70,7 @@ SetupNginx() {
     $ctr_cli volume create nginx-vol > nginx.log
 
     mv nginx.conf.d/nginx.conf.tmp nginx.conf.d/nginx.conf
+    mv nginx_data/tunnel.pac.tmp nginx_data/tunnel.pac
 
 	# run the containers on the $ctr_cli subnet
 	$ctr_cli run -d \

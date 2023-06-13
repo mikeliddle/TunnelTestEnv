@@ -249,7 +249,7 @@ Function New-TunnelEnvironment {
     } else {
         New-NetworkRules -resourceGroup $ResourceGroup.name -VmName $VmName -WithSSHOpen $WithSSHOpen
     }
-    
+
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
         Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name
