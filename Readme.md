@@ -26,7 +26,7 @@ Optional Parameters:
 - `-Image`: The image to use for the VM. Default is `Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest`.
 - `-Environment`: The Intune cloud environment to use. Default is `PE`.
 - `-Email`: The email address to use for the Let's Encrypt certificate. Default is to detect this from the VM login information.
-- `-Username`: The username to use for the VM. Default is `azureuser`.
+- `-Username`: The Username to use for the VM. Default is `azureuser`.
 - `-AdApplication`: The name of the AAD application to use for authentication. Default is `Generated MAM Tunnel`.
 - `-VMTenantCredential`: a pscredential object used for silent authentication to the VM subscription. Default is to prompt for credentials.
 - `-TenantCredential`: a pscredential object used for silent authentication to the tunnel tenant. Default is to prompt for credentials.
@@ -40,7 +40,7 @@ Switches:
 - `-NoProxy` - skip configuring the proxy.
 - `-WithSSHOpen` - open the SSH port on the VM.
 - `-StayLoggedIn` - stay logged in to the accounts after the script finishes.
-- `-UseEnterpriseCa` - use the enterprise certificate instead of a publicly trusted certificate for Tunnel.
+- `-NoPki` - use the publicly trusted certificate instead of an enterprise certificate for Tunnel.
 
 ## Automate just the Environment
 
