@@ -141,5 +141,14 @@ Function New-ServiceVM {
     Write-Host "DNS is '$($vmdata.fqdns)'"
     return $vmdata
 }
+
+Function Update-RebootVM {
+    param(
+        [string] $VmName,
+        [string] $resourceGroup = "$VmName-group"
+    )
+
+    az vm restart --resource-group $resourceGroup --name $VmName
+}
 #endregion Azure Functions
 

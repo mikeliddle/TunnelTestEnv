@@ -242,9 +242,9 @@ Function New-TunnelEnvironment {
     $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
 
     $ServiceVMName = "$VmName-server"
+    $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
 
     if (-Not $Simple) {
-        $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
         New-AdvancedNetworkRules -resourceGroup $ResourceGroup.name -ProxyIP $ProxyIP -VmName $VmName -WithSSHOpen $WithSSHOpen
     } else {
         New-NetworkRules -resourceGroup $ResourceGroup.name -VmName $VmName -WithSSHOpen $WithSSHOpen
@@ -262,7 +262,7 @@ Function New-TunnelEnvironment {
     # Setup DNS
     New-DnsServer -TunnelVMDNS $TunnelVM.fqdns -ProxyIP $ProxyIP -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns
     # Setup WebServers
-    New-NginxSetup -TunnelVMDNS $TunnelVM.fqdns -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns -Email $Email
+    New-NginxSetup -TunnelVMDNS $TunnelVM.fqdns -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns -Email $Email -ServerIp $ProxyIP
 
     Update-RebootVM -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
 

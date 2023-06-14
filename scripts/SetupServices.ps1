@@ -27,13 +27,15 @@ Function New-NginxSetup {
         [string] $Username,
         [string] $SSHKeyPath,
         [string] $ServiceVMDNS,
-        [string] $Email
+        [string] $Email,
+        [string] $ServerIP
     )
 
     Write-Header "Configuring Nginx..."
     $Content = Get-Content ./nginx.conf.d/nginx.conf
     $Content = $Content -replace "##DOMAIN_NAME##", "$TunnelVMDNS"
     $Content = $Content -replace "##SERVER_NAME##", "$($TunnelVMDNS.split('.')[0])"
+    $Content = $Content -replace "##SERVER_IP##", "$ServerIP"
     Set-Content -Path ./nginx.conf.d/nginx.conf.tmp -Value $Content -Force
 
     Write-Header "Copying files over"
