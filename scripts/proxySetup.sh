@@ -84,6 +84,9 @@ Uninstall() {
 ConfigureSquid() {
     cp ./squid.conf.tmp /etc/squid/squid.conf
     cp ./allowlist.tmp /etc/squid/allowlist
+    cp ./ssl_error_domains /etc/squid/ssl_error_domains
+    cp ./ssl_exclude_domains /etc/squid/ssl_exclude_domains
+    cp ./ssl_exclude_ips /etc/squid/ssl_exclude_ips
     
     if [ $? -ne 0 ]; then
         LogError "Failed to configure Squid."
