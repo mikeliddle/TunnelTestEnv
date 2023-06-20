@@ -10,7 +10,7 @@ Function Login-Azure {
         return
     }
 
-    $accounts = az account show --only-show-errors | ConvertFrom-Json | Out-Null
+    $accounts = az account show --only-show-errors | ConvertFrom-Json
 
     if ($accounts.Count -eq 0) {
         Write-Header "Logging into Azure..."
