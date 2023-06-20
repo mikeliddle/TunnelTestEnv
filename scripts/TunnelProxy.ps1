@@ -31,10 +31,20 @@ Function Initialize-Proxy {
         [string] $Username = "azureuser",
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
         [string] $TunnelServer = "$VmName.westus.cloudapp.azure.com",
-        [string] $ResourceGroup = "$VmName-group"
+        [string] $ResourceGroup = "$VmName-group",
+        [switch] $UseInspection = $false
     )
 
-    $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
+    if ($UseInspection) {
+        Write-Header "Setting up proxy for TLS inspection..."
+        $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "BreakAndInspect.conf"
+        $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
+        (Get-Content $ExcludeDomainFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file (Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains.tmp")
+    } else {
+        $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
+        $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
+    }
+
     $allowlistFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist"
     $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
     $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
@@ -61,9 +71,12 @@ Function Initialize-Proxy {
 
     Write-Header "Copying proxy script to remote server..."
 
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/squid.conf" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/allowlist" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_error_domains" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$ExcludeDomainFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/ssl_exclude_domains" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_exclude_ips" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$ProxyVMData"):~/" > $null
 
@@ -75,9 +88,16 @@ Function Invoke-ProxyScript {
     param(
         [Object] $ProxyVMData,
         [string] $Username = "azureuser",
-        [string] $SSHKeyPath = "$HOME/.ssh/$VmName"
+        [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
+        [switch] $UseInspection = $false
     )
+
     Write-Header "Connecting into remote server..."
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
+
+    if ($UseInspection) {
+        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh -b'"
+    } else {
+        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
+    }
 }
 #endregion Proxy Functions
