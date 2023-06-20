@@ -29,9 +29,13 @@ Function Move-SSHKeys {
 
 Function Remove-SSHKeys {
     param(
-        [string] $SSHKeyPath
+        [string] $SSHKeyPath,
+        [string] $TunnelFQDN,
+        [string] $ServiceFQDN
     )
+
     Write-Header "Deleting SSH keys..."
+
     if (Test-Path $SSHKeyPath) {
         Remove-Item -Path $SSHKeyPath -Force
     }
@@ -45,6 +49,10 @@ Function Remove-SSHKeys {
     else {
         Write-Host "Key at path '$SSHKeyPath.pub' does not exist."
     }
+
+    Write-Header "Deleting SSH keys from known hosts..."
+    ssh-keygen -R $TunnelFQDN
+    ssh-keygen -R $ServiceFQDN
 }
 
 Function New-RandomPassword {

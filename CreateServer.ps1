@@ -308,7 +308,7 @@ Function Remove-TunnelEnvironment {
     Initialize-Variables
     
     Remove-ResourceGroup -resourceGroup "$VmName-group"
-    Remove-SSHKeys -SSHKeyPath "$HOME/.ssh/$VmName"
+    Remove-SSHKeys -SSHKeyPath "$HOME/.ssh/$VmName" -TunnelFQDN "$VmName.$Location.cloudapp.azure.com" -ServiceFQDN "$VmName-server.$Location.cloudapp.azure.com"
 
     Remove-IosProfiles -VmName $VmName
     Remove-AndroidProfiles -VmName $VmName
@@ -316,7 +316,10 @@ Function Remove-TunnelEnvironment {
     Remove-TunnelServers -SiteName $VmName
     Remove-TunnelSite -SiteName $VmName
     Remove-TunnelConfiguration -ServerConfigurationName $VmName
-    Logout
+
+    if (!$StayLoggedIn) {
+        Logout
+    }
 }
 
 Function New-ProfilesOnlyEnvironment {
@@ -324,16 +327,22 @@ Function New-ProfilesOnlyEnvironment {
     Login
     Initialize-Variables
 
-    New-TunnelConfiguration
-    New-TunnelSite
+    $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns
+    $TunnelSite = New-TunnelSite -SiteName $VmName -FQDN $TunnelVM.fqdns -ServerConfiguration $ServerConfiguration
 
-    Update-ADApplication
-    New-GeneratedXCConfig
+    $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
+    New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
     
-    New-IOSProfiles
-    New-AndroidProfiles
+    if ($Platform -eq "ios" -or $Platform -eq "all") {
+        New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+    }
+    if ($Platform -eq "android" -or $Platform -eq "all") {
+        New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+    }
 
-    Logout
+    if (!$StayLoggedIn) {
+        Logout
+    }
 }
 
 # Import functions from dependent files

@@ -4,23 +4,30 @@ Function Login-Graph {
         [PSCredential] $TenantCredential = $null
     )
 
-    Write-Header "Logging into graph..."
-    if (-Not $TenantCredential) {    
-        Write-Header "Select the account to manage the profiles."
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
-    } else {
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.Username) $($TenantCredential.GetNetworkCredential().Password)"
-    }
-    
-    if (-Not $JWT) {
-        Write-Error "Could not get JWT for account"
-        Exit -1
-    }
+    $GraphContext = Get-MgContext
 
-    Connect-MgGraph -AccessToken $JWT | Out-Null
-    
-    # Switch to beta since most of our endpoints are there
-    Select-MgProfile -Name "beta"    
+    if ($GraphContext) {
+        Write-Warning "Already signed into graph as $($GraphContext.Account)"
+        Write-Warning "If you don't want to use this account, please logout, then run this script again."
+    } else {
+        Write-Header "Logging into graph..."
+        if (-Not $TenantCredential) {
+            Write-Header "Select the account to manage the profiles."
+            $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
+        } else {
+            $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.Username) $($TenantCredential.GetNetworkCredential().Password)"
+        }
+        
+        if (-Not $JWT) {
+            Write-Error "Could not get JWT for account"
+            Exit -1
+        }
+
+        Connect-MgGraph -AccessToken $JWT | Out-Null
+        
+        # Switch to beta since most of our endpoints are there
+        Select-MgProfile -Name "beta"
+    }
 }
 #endregion Graph Functions
 
