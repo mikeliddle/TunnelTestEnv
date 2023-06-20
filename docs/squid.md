@@ -11,3 +11,8 @@ Squid has two log files, a cache log, and an access log. Typically the access lo
 ## Break and Inspect
 
 The packaged version of squid included with most major Linux distributions does not have openssl built into it, and does not support TLS inspection via ssl_bump. As a result, we are using a third-party package source to grab a version of squid that does support this. This is meant to be a proof of concept, and should not be considered a secure environment for production use. The configuration file has a parameter to specify the cert generation tool that squid will use (most online guides don't add this information), as well as information for using the PKI previously generated on this box. In the future it would be good to add in support for trusting this PKI we have generated, but for now, we disable proxy->server TLS validation for the internal sites.
+
+## Future tasks
+
+Add Authentication options
+Use better template for config files to allow for more shared settings. (e.g. auth and ssl_bump in the same file, or just one or the other)
