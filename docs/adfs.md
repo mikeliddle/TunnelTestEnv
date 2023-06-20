@@ -1,5 +1,7 @@
 # ADFS
 
+WIP: do not use yet
+
 ## Server Components for AD FS
 
 1. AD Domain Controller
