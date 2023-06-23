@@ -292,6 +292,8 @@ Function New-TunnelEnvironment {
 
     Update-PrivateDNSAddress -FQDN $ServiceVM.fqdns -VmUsername $Username -SSHKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration -DNSPrivateAddress $ProxyIP
 
+    New-ServicePrincipal -AADEnvironment Environment
+
     $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
     New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
 
@@ -327,7 +329,6 @@ Function Remove-TunnelEnvironment {
 }
 
 Function New-ProfilesOnlyEnvironment {
-    Test-Prerequisites
     Login
     Initialize-Variables
 

@@ -37,7 +37,24 @@ Function New-ServicePrincipal {
         [String]$AADEnvironment
     )
 
-    Import-Module -Name AzureAD
+    $TunnelServicePrincipal = Get-MgServicePrincipal -Filter "DisplayName eq 'Microsoft Tunnel Gateway'"
+    if ($TunnelServicePrincipal) {
+        return
+    }
+
+    Write-Header "Provisioning Service Principal for Microsoft Tunnel Gateway..."
+    Import-Module -Name AzureAD -ErrorVariable error
+
+    if ($error -ne $null) {
+        if ($error.Exception.Message.Contains("MSIL")) {
+            Write-Error "Unsupported Processor Architecture for AzureAD module, this step will need to be performed on a different machine."
+            return
+        } else {
+            Install-Module -Name AzureAD -Force -Scope CurrentUser
+            Import-Module -Name AzureAD
+            return
+        }
+    }
 
     if ($AADEnvironment -ieq "onedf" -or $AADEnvironment -ieq "df" -or $AADEnvironment -ieq "internal") {
         try {
@@ -225,7 +242,7 @@ Function Update-ADApplication {
         [string] $TenantId,
         [string[]] $BundleIds
     )
-    
+
     $App = Get-MgApplication -Filter "DisplayName eq '$ADApplication'" -Limit 1
     if ($App) {
         Write-Success "Client Id: $($App.AppId)"
