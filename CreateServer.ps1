@@ -221,7 +221,11 @@ Function Initialize-Variables {
     $script:FQDN = "$VmName.$Location.cloudapp.azure.com"
 
     if ($PACUrl -eq "") {
-        $script:PACUrl = "http://$FQDN/tunnel.pac"
+        if ($NoProxy || $Simple) {
+            $script:PACUrl = ""
+        } else {
+            $script:PACUrl = "http://$FQDN/tunnel.pac"
+        }
     }
 
     if (-Not $Delete) {
