@@ -46,14 +46,15 @@ Function New-ADDCVM {
     Write-Header "Creating VM '$winName'..."
 
     $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
-`
+
     $domainLength = if("$DomainName".Split('.')[0].Length -gt 15) { 15 } Else { "$DomainName".Split('.')[0].Length }
+    $NetBiosName = $DomainName.Split('.')[0].Substring(0,$domainLength)
     # Install AD DS role on the first VM and promote it to a domain controller
     az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
         Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
         Import-Module ADDSDeployment
-        Install-ADDSForest -DatabasePath "D:\NTDS" -DomainMode Win2012R2 -DomainName "$DomainName" -DomainNetbiosName "$($DomainName.Split('.')[0].Substring(0,$domainLength))" -ForestMode Win2012R2 -InstallDns -LogPath "D:\NTDS"  -SysvolPath "D:\SYSVOL" -Force
-        Install-ADDSDomainController -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DatabasePath "D:\NTDS" -DomainName "$DomainName" -InstallDns -LogPath "D:\NTDS" -NoGlobalCatalog:$false -SiteName "Default-First-Site-Name" -SysvolPath "D:\SYSVOL" -Force
+        Install-ADDSForest -DomainName "$DomainName" -DomainNetbiosName "$NetBiosName" -InstallDns -Force
+        Install-ADDSDomainController -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DomainName "$DomainName" -InstallDns -Force
 "@
 
     # Create AD Users and groups
