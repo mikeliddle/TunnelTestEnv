@@ -85,6 +85,10 @@ param(
     [switch]$NoProxy,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [pscredential[]]$AuthenticatedProxyCredentials,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [switch]$NoPki,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -260,8 +264,8 @@ Function New-TunnelEnvironment {
             Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection
             Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection
         } else {
-            Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name
-            Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath
+            Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
+            Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
         }
     }
 

@@ -32,7 +32,8 @@ Function Initialize-Proxy {
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
         [string] $TunnelServer = "$VmName.westus.cloudapp.azure.com",
         [string] $ResourceGroup = "$VmName-group",
-        [switch] $UseInspection = $false
+        [switch] $UseInspection = $false,
+        [pscredential[]] $AuthenticatedProxyCredentials = $null
     )
 
     if ($UseInspection) {
@@ -45,11 +46,25 @@ Function Initialize-Proxy {
         $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
     }
 
+    if ($AuthenticatedProxyCredentials) {
+        $passwordsFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "passwords.tmp"
+        $basicAuthFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "basicAuth"
+        Write-Header "Creating basic authentication users for proxy..."
+
+        foreach ($cred in $AuthenticatedProxyCredentials) {
+            "$($cred.UserName):$($cred.GetNetworkCredential().Password)" | Add-Content $passwordsFile
+        }
+        #htpasswd -bc $passwordsFile $ProxyCredential.Username $ProxyCredential.GetNetworkCredential().Password
+        $basicAuthConfig = Get-Content $basicAuthFile -Raw
+    } else {
+        $basicAuthConfig = ""
+    }
+
     $allowlistFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist"
     $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
     $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
 
-    (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$configFile.tmp"
+    (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" -replace "##BASIC_AUTH##", "$basicAuthConfig" | out-file "$configFile.tmp"
     (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
 
     $ProxyURL = "proxy.$TunnelServer"
@@ -61,12 +76,8 @@ Function Initialize-Proxy {
         (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile"
     }
 
-    # Replace CR+LF with LF
-    $text = [IO.File]::ReadAllText($proxyScript) -replace "`r`n", "`n"
-    [IO.File]::WriteAllText($proxyScript, $text)
-
-    # Replace CR with LF
-    $text = [IO.File]::ReadAllText($proxyScript) -replace "`r", "`n"
+    # Replace CR+LF and CR with LF
+    $text = [IO.File]::ReadAllText($proxyScript) -replace "`r`n", "`n" -replace "`r", "`n"
     [IO.File]::WriteAllText($proxyScript, $text)
 
     Write-Header "Copying proxy script to remote server..."
@@ -80,6 +91,10 @@ Function Initialize-Proxy {
 
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$ProxyVMData"):~/" > $null
 
+    if ($AuthenticatedProxyCredentials) {
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$passwordsFile" "$($Username)@$("$($ProxyVMData.fqdns)"):~/passwords" > $null
+    }
+
     Write-Header "Marking proxy scripts as executable..."
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
 }
@@ -89,13 +104,16 @@ Function Invoke-ProxyScript {
         [Object] $ProxyVMData,
         [string] $Username = "azureuser",
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
-        [switch] $UseInspection = $false
+        [switch] $UseInspection = $false,
+        [pscredential[]] $AuthenticatedProxyCredentials = $null
     )
 
     Write-Header "Connecting into remote server..."
 
     if ($UseInspection) {
         ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh -b'"
+    } elseif ($AuthenticatedProxyCredentials) {
+        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh -a'"
     } else {
         ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
     }
