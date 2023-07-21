@@ -85,6 +85,10 @@ param(
     [switch]$NoProxy,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [switch]$NoPACUrl,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [pscredential[]]$AuthenticatedProxyCredentials,
 
@@ -106,6 +110,7 @@ param(
     [switch]$Delete,
 
     [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [switch]$ProfilesOnly,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -237,6 +242,26 @@ Function Initialize-Variables {
         }
     }
 }
+
+Function New-Profiles {
+    if ($NoPACUrl) {
+        if ($Platform -eq "ios" -or $Platform -eq "all") {
+            New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $TunnelVm.fqdns -ProxyPort 3128 -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        }
+        if ($Platform -eq "android" -or $Platform -eq "all") {
+            New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $TunnelVm.fqdns -ProxyPort 3128 -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        }
+    } else {
+        $PACUrl = if ($NoProxy) { "" } else { "http://$($TunnelVm.fqdns)/tunnel.pac" }
+
+        if ($Platform -eq "ios" -or $Platform -eq "all") {
+            New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl $PACUrl -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        }
+        if ($Platform -eq "android" -or $Platform -eq "all") {
+            New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl $PACUrl -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        }
+    }
+}
 #endregion Helper Functions
 
 #region Main Functions
@@ -295,13 +320,8 @@ Function New-TunnelEnvironment {
     $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
     New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
 
-    if ($Platform -eq "ios" -or $Platform -eq "all") {
-        New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
-    }
-    if ($Platform -eq "android" -or $Platform -eq "all") {
-        New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
-    }
-
+    New-Profiles
+    
     if (!$StayLoggedIn) {
         Logout
     }
@@ -337,11 +357,23 @@ Function New-ProfilesOnlyEnvironment {
     $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
     New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
     
+    New-Profiles
+
+    if (!$StayLoggedIn) {
+        Logout
+    }
+}
+
+Function Remove-ProfilesOnlyEnvironment {
+    Test-Prerequisites
+    Login
+    Initialize-Variables
+
     if ($Platform -eq "ios" -or $Platform -eq "all") {
-        New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        Remove-IosProfiles -VmName $VmName
     }
     if ($Platform -eq "android" -or $Platform -eq "all") {
-        New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl "http://$($TunnelVm.fqdns)/tunnel.pac" -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        Remove-AndroidProfiles -VmName $VmName
     }
 
     if (!$StayLoggedIn) {
@@ -360,13 +392,19 @@ Function New-ProfilesOnlyEnvironment {
 Test-Prerequisites
 Initialize
 
-if ($ProfilesOnly) {
-    New-ProfilesOnlyEnvironment
-} elseif ($Delete) {
-    Remove-TunnelEnvironment
-} elseif ($WithADFS) {
-    New-ADFSEnvironment
+if ($Delete) {
+    if ($ProfilesOnly) {
+        Remove-ProfilesOnlyEnvironment
+    } else {
+        Remove-TunnelEnvironment
+    }
 } else {
-    New-TunnelEnvironment
+    if ($ProfilesOnly) {
+        New-ProfilesOnlyEnvironment
+    } elseif ($WithADFS) {
+        New-ADFSEnvironment
+    } else {
+        New-TunnelEnvironment
+    }
 }
 #endregion Main Functions

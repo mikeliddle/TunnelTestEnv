@@ -383,7 +383,7 @@ Function New-IosDeviceConfigurationPolicy {
     }
     else {
         Write-Header "Creating Device Configuration policy '$DisplayName'..."
-        $Body = @{
+        $Payload = @{
             "@odata.type"         = "#microsoft.graph.iosVpnConfiguration"
             displayName           = $DisplayName
             id                    = [System.Guid]::Empty.ToString()
@@ -396,13 +396,20 @@ Function New-IosDeviceConfigurationPolicy {
                 address     = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                 description = ""
             }
-            proxyServer           = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
             customData            = @(@{
                     key   = "MSTunnelProtectMode"
                     value = "1"
                 })
             enableSplitTunneling  = $false
-        } | ConvertTo-Json -Depth 10
+        }
+
+        if ($PACUrl -ne "" -or $ProxyHostname -ne "") {
+            $Payload += @{
+                proxyServer = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+            }
+        }
+
+        $Body = $Payload | ConvertTo-Json -Depth 10
 
         $IosDeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
 
@@ -595,7 +602,7 @@ Function New-AndroidDeviceConfigurationPolicy {
     }
     else {
         Write-Header "Creating Device Configuration policy '$DisplayName'..."
-        $Body = @{
+        $Payload = @{
             "@odata.type"         = "#microsoft.graph.androidWorkProfileVpnConfiguration"
             displayName           = $DisplayName
             id                    = [System.Guid]::Empty.ToString()
@@ -608,12 +615,19 @@ Function New-AndroidDeviceConfigurationPolicy {
                     address     = "$($Site.PublicAddress):$($ServerConfiguration.ListenPort)"
                     description = ""
                 })
-            proxyServer           = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
             customData            = @(@{
                     key   = "MicrosoftDefenderAppSettings"
                     value = $null
                 })
-        } | ConvertTo-Json -Depth 10
+        }
+
+        if ($PACUrl -ne "" -or $ProxyHostname -ne "") {
+            $Payload += @{
+                proxyServer = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+            }
+        }
+
+        $Body = $Payload | ConvertTo-Json -Depth 10
 
         $AndroidDeviceConfigurationPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
 
