@@ -244,16 +244,25 @@ Function Initialize-Variables {
 }
 
 Function New-Profiles {
+    if ($NoProxy) {
+        $ProxyHostname = ""
+        $ProxyPort = ""
+        $PACUrl = ""
+    } else {
+        # TODO: If $TunnelVm doesn't resolve (due to being profiles only), then fetch it from the az cli
+        $ProxyHostname = $TunnelVm.fqdns
+        $ProxyPort = "3128"
+        $PACUrl = "http://$($TunnelVm.fqdns)/tunnel.pac"
+    }
+
     if ($NoPACUrl) {
         if ($Platform -eq "ios" -or $Platform -eq "all") {
-            New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $TunnelVm.fqdns -ProxyPort 3128 -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+            New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $TunnelSite -ServerConfiguration $ServerConfiguration
         }
         if ($Platform -eq "android" -or $Platform -eq "all") {
-            New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $TunnelVm.fqdns -ProxyPort 3128 -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+            New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $TunnelSite -ServerConfiguration $ServerConfiguration
         }
     } else {
-        $PACUrl = if ($NoProxy) { "" } else { "http://$($TunnelVm.fqdns)/tunnel.pac" }
-
         if ($Platform -eq "ios" -or $Platform -eq "all") {
             New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl $PACUrl -Site $TunnelSite -ServerConfiguration $ServerConfiguration
         }
