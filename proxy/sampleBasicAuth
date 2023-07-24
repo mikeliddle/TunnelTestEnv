@@ -20,11 +20,19 @@ acl Safe_ports port 591         # filemaker
 acl Safe_ports port 777         # multiling http
 acl CONNECT method CONNECT
 
-##BASIC_AUTH##
 
-acl allowlist dstdomain "/etc/squid/allowlist"
+auth_param basic program /usr/lib/squid/basic_ncsa_auth /etc/squid/passwords
+auth_param basic realm proxy
+#auth_param basic credentialsttl 2 hours
+acl authenticated proxy_auth REQUIRED
+http_access allow authenticated
 
-http_access deny !allowlist
+acl all src 0.0.0.0/0
+http_access allow all
+
+#acl allowlist dstdomain "/etc/squid/allowlist"
+
+#http_access deny !allowlist
 
 http_access deny !Safe_ports
 
@@ -40,7 +48,7 @@ http_access deny all
 
 http_port 3128
 
-append_domain .##DOMAIN_NAME##
+append_domain .toddbohm1038.westus.cloudapp.azure.com
 
 refresh_pattern ^ftp:           1440    20%     10080
 refresh_pattern ^gopher:        1440    0%      1440
@@ -50,3 +58,5 @@ refresh_pattern \/Release(|\.gpg)$ 0 0% 0 refresh-ims
 refresh_pattern \/InRelease$ 0 0% 0 refresh-ims
 refresh_pattern \/(Translation-.*)(|\.bz2|\.gz|\.xz)$ 0 0% 0 refresh-ims
 refresh_pattern .               0       20%     4320
+
+visible_hostname proxy.toddbohm1038.westus.cloudapp.azure.com
