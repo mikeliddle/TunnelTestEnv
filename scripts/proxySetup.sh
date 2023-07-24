@@ -15,29 +15,35 @@ LogWarning() {
 InstallPrereqs() {
     LogInfo "Installing prerequisites..."
     maxRetries=3
-    retryCount=0
-    installSucceeded=1
     sudo apt-get -y update >> install.log 2>&1
 
-    while [ $installSucceeded -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
-        sudo apt-get install -y squid >> install.log 2>&1
-        
-        if [ $? -ne 0 ]; then
-            LogError "Failed to install prerequisites."
-            installSucceeded=1
-            retryCount=$((retryCount+1))
-            sleep 5
-        else
-            installSucceeded=0
-            break
+    for command in "sudo apt-get install -y squid" "sudo apt-get install -y apache2-utils";
+    do
+        LogInfo "Preparing command '$command'..."
+        retryCount=0
+        installSucceeded=1
+        while [ $installSucceeded -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
+            LogInfo "Running command '$command'..."
+            $command >> install.log 2>&1
+            
+            if [ $? -ne 0 ]; then
+                LogError "Failed to install prerequisites."
+                installSucceeded=1
+                retryCount=$((retryCount+1))
+                sleep 5
+            else
+                LogInfo "Succeeded in running command '$command'"
+                installSucceeded=0
+                break
+            fi
+        done
+
+        if [ $installSucceeded -ne 0 ]; then
+            LogError "Failed to install prerequisites after $maxRetries attempts."
+            exit 1
         fi
     done
-    
-    if [ $installSucceeded -ne 0 ]; then
-        LogError "Failed to install prerequisites after $maxRetries attempts."
-        exit 1
-    fi
-    
+
     LogInfo "Prerequisites installed."
 }
 
@@ -77,6 +83,20 @@ InstallInspectionProxy() {
     LogInfo "Prerequisites installed."
 }
 
+PrepareBasicAuthentication() {
+    LogInfo "Preparing Basic Authentication..."
+    touch hashedpasswords
+    while IFS="" read -r line || [ -n "$line" ]
+    do
+        IFS=':' read -r username password <<< "$line"
+        htpasswd -b hashedpasswords $username $password
+    done < ./passwords
+    rm ./passwords
+    mv ./hashedpasswords ./passwords
+    cp ./passwords /etc/squid/passwords
+    LogInfo "Prepared Basic Authentication..."
+}
+
 Uninstall() {
     LogInfo "Uninstalling..."
     sudo apt-get remove -y squid >> install.log 2>&1
@@ -99,8 +119,15 @@ ConfigureSquid() {
     LogInfo "Squid configured."
 }
 
-while getopts "bu" opt; do
+while getopts "abu" opt; do
     case $opt in
+        a)
+            LogInfo "Configuring with basic authentication."
+            InstallPrereqs
+            PrepareBasicAuthentication
+            ConfigureSquid
+            exit 0
+            ;;
         b)
             InstallInspectionProxy
             ConfigureSquid
