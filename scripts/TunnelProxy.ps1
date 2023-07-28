@@ -36,67 +36,78 @@ Function Initialize-Proxy {
         [pscredential[]] $AuthenticatedProxyCredentials = $null
     )
 
-    if ($UseInspection) {
-        Write-Header "Setting up proxy for TLS inspection..."
-        $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "BreakAndInspect.conf"
-        $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
-        (Get-Content $ExcludeDomainFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file (Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains.tmp")
-    } else {
-        $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
-        $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
-    }
-
-    if ($AuthenticatedProxyCredentials) {
-        $passwordsFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "passwords.tmp"
-        $basicAuthFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "basicAuth"
-        Write-Header "Creating basic authentication users for proxy..."
-
-        foreach ($cred in $AuthenticatedProxyCredentials) {
-            "$($cred.UserName):$($cred.GetNetworkCredential().Password)" | Add-Content $passwordsFile
+    try {
+        if ($UseInspection) {
+            Write-Header "Setting up proxy for TLS inspection..."
+            $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "BreakAndInspect.conf"
+            $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
+            (Get-Content $ExcludeDomainFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file (Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains.tmp")
+        } else {
+            $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
+            $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
         }
-        #htpasswd -bc $passwordsFile $ProxyCredential.Username $ProxyCredential.GetNetworkCredential().Password
-        $basicAuthConfig = Get-Content $basicAuthFile -Raw
-    } else {
-        $basicAuthConfig = ""
+
+        if ($AuthenticatedProxyCredentials) {
+            $passwordsFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "passwords.tmp"
+            $basicAuthFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "basicAuth"
+            Write-Header "Creating basic authentication users for proxy..."
+
+            # remove any old temporary passwords file
+            Remove-Item $passwordsFile
+
+            foreach ($cred in $AuthenticatedProxyCredentials) {
+                "$($cred.UserName):$($cred.GetNetworkCredential().Password)" | Add-Content $passwordsFile
+            }
+
+            $basicAuthConfig = Get-Content $basicAuthFile -Raw
+        } else {
+            $basicAuthConfig = ""
+        }
+
+        $allowlistFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist"
+        $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
+        $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
+
+        (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" -replace "##BASIC_AUTH##", "$basicAuthConfig" | out-file "$configFile.tmp"
+        (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
+
+        $ProxyURL = "proxy.$TunnelServer"
+        (Get-Content $pacFile) -replace "##PROXY_URL##", "$ProxyURL" | out-file "$pacFile.tmp"
+        $pacFile = "$pacFile.tmp"
+
+        $proxyBypassNames = ("www.google.com", "www.ipchicken.com", "excluded.$($TunnelServer)")
+        foreach ($name in $proxyBypassNames) {
+            (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile"
+        }
+
+        # Replace CR+LF and CR with LF
+        $text = [IO.File]::ReadAllText($proxyScript) -replace "`r`n", "`n" -replace "`r", "`n"
+        [IO.File]::WriteAllText($proxyScript, $text)
+
+        Write-Header "Copying proxy script to remote server..."
+
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/squid.conf" > $null
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/allowlist" > $null
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_error_domains" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$ExcludeDomainFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/ssl_exclude_domains" > $null
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_exclude_ips" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
+
+        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$ProxyVMData"):~/" > $null
+
+        if ($AuthenticatedProxyCredentials) {
+            scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$passwordsFile" "$($Username)@$("$($ProxyVMData.fqdns)"):~/passwords" > $null
+        }
+
+        Write-Header "Marking proxy scripts as executable..."
+        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
     }
-
-    $allowlistFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist"
-    $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
-    $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
-
-    (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" -replace "##BASIC_AUTH##", "$basicAuthConfig" | out-file "$configFile.tmp"
-    (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
-
-    $ProxyURL = "proxy.$TunnelServer"
-    (Get-Content $pacFile) -replace "##PROXY_URL##", "$ProxyURL" | out-file "$pacFile.tmp"
-    $pacFile = "$pacFile.tmp"
-
-    $proxyBypassNames = ("www.google.com", "excluded.$($TunnelServer)")
-    foreach ($name in $proxyBypassNames) {
-        (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile"
+    finally {
+        # Clean up any passwords file if it is present
+        if (Test-Path $passwordsFile) {
+            Remove-Item $passwordsFile
+        }
     }
-
-    # Replace CR+LF and CR with LF
-    $text = [IO.File]::ReadAllText($proxyScript) -replace "`r`n", "`n" -replace "`r", "`n"
-    [IO.File]::WriteAllText($proxyScript, $text)
-
-    Write-Header "Copying proxy script to remote server..."
-
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$configFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/squid.conf" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$allowlistFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/allowlist" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$proxyScript" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_error_domains" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$ExcludeDomainFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/ssl_exclude_domains" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_exclude_ips" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
-
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$ProxyVMData"):~/" > $null
-
-    if ($AuthenticatedProxyCredentials) {
-        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$passwordsFile" "$($Username)@$("$($ProxyVMData.fqdns)"):~/passwords" > $null
-    }
-
-    Write-Header "Marking proxy scripts as executable..."
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ProxyVMData.fqdns)" "chmod +x ~/proxySetup.sh"
 }
 
 Function Invoke-ProxyScript {
