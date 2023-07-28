@@ -32,23 +32,17 @@ Function Initialize-Proxy {
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
         [string] $TunnelServer = "$VmName.westus.cloudapp.azure.com",
         [string] $ResourceGroup = "$VmName-group",
-        [switch] $UseInspection = $false,
+        [bool] $UseInspection = $false,
+        [bool] $UseAllowList = $false,
         [pscredential[]] $AuthenticatedProxyCredentials = $null
     )
 
-    if ($UseInspection) {
-        Write-Header "Setting up proxy for TLS inspection..."
-        $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "BreakAndInspect.conf"
-        $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
-        (Get-Content $ExcludeDomainFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file (Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains.tmp")
-    } else {
-        $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
-        $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
-    }
+    $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
+    $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
 
     if ($AuthenticatedProxyCredentials) {
         $passwordsFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "passwords.tmp"
-        $basicAuthFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "basicAuth"
+        $basicAuthFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "basicAuth.conf"
         Write-Header "Creating basic authentication users for proxy..."
 
         foreach ($cred in $AuthenticatedProxyCredentials) {
@@ -60,11 +54,28 @@ Function Initialize-Proxy {
         $basicAuthConfig = ""
     }
 
+    if ($UseInspection) {
+        Write-Header "Setting up proxy for TLS inspection..."
+        (Get-Content $ExcludeDomainFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file (Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains.tmp")
+        $breakAndInspectConfig = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "BreakAndInspect.conf"
+        $breakAndInspectConfig = Get-Content $breakAndInspectConfig -Raw
+    } else {
+        $breakAndInspectConfig = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "vanilla.conf"
+        $breakAndInspectConfig = Get-Content $breakAndInspectConfig -Raw
+    }
+
+    if ($UseAllowList) {
+        $allowlistConfig = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist.conf"
+        $allowlistConfig = Get-Content $allowlistConfig -Raw
+    } else {
+        $allowlistConfig = ""
+    }
+
     $allowlistFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist"
     $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
     $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
 
-    (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" -replace "##BASIC_AUTH##", "$basicAuthConfig" | out-file "$configFile.tmp"
+    (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$TunnelServer" -replace "##BASIC_AUTH##", "$basicAuthConfig" -replace "##BREAK_AND_INSPECT##", "$breakAndInspectConfig" -replace "##ALLOWLIST##", "$allowlistConfig" | out-file "$configFile.tmp"
     (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$TunnelServer" | out-file "$allowlistFile.tmp"
 
     $ProxyURL = "proxy.$TunnelServer"
@@ -104,18 +115,20 @@ Function Invoke-ProxyScript {
         [Object] $ProxyVMData,
         [string] $Username = "azureuser",
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
-        [switch] $UseInspection = $false,
+        [bool] $UseInspection = $false,
         [pscredential[]] $AuthenticatedProxyCredentials = $null
     )
 
     Write-Header "Connecting into remote server..."
 
+    $flags = ""
     if ($UseInspection) {
-        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh -b'"
-    } elseif ($AuthenticatedProxyCredentials) {
-        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh -a'"
-    } else {
-        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh'"
+        $flags += " -b"
+    } 
+    if ($AuthenticatedProxyCredentials) {
+        $flags += " -a"
     }
+
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$("$($ProxyVMData.fqdns)")" "sudo su -c './proxySetup.sh$flags'"
 }
 #endregion Proxy Functions
