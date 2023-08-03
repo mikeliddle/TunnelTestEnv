@@ -3,6 +3,11 @@ $script:WindowsVmSize = "Standard_DS1_v2"
 
 #region ADFS Functions
 Function Initialize-ADFSVariables {
+    param(
+        [string] $VmName,
+        [string] $Email
+    )
+
     $script:VmName = $VmName.ToLower()
     $script:Account = (az account show | ConvertFrom-Json)
     $script:Username = "AdminUser"
@@ -26,39 +31,56 @@ Function New-ADFSEnvironment {
         [string] $VmName,
         [string] $DomainName,
         [string] $ResourceGroup,
-        [string] $location
+        [string] $location,
+        [string] $Email
     )
     Write-Header "Creating ADFS Environment"
 
     Login-Azure -SubscriptionId $SubscriptionId -VmTenantCredential $VmTenantCredential
     
-    Initialize-ADFSVariables
+    Initialize-ADFSVariables -VmName $VmName -Email $Email
     New-ResourceGroup -resourceGroup $ResourceGroup -location $location | Out-Null
 
-    New-ADDCVM
+    New-ADDCVM -VmName $VmName
 }
 
 Function New-ADDCVM {
+    param(
+        [string] $VmName
+    )
     $AdminPassword = New-RandomPassword
+    $Password = New-RandomPassword
+    $Username = "TunnelUser"
+    $GroupName = ""
     $length = if($VmName.Length -gt 12) { 12 } else { $VmName.Length }
     $winName=$VmName.Substring(0,$length) + "-dc"
     
     Write-Header "Creating VM '$winName'..."
 
-    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
+    $windowsVmData = az vm create --location $location --resource-group $resourceGroup --name $winName --image $WindowsServerImage --size $WindowsVmSize --public-ip-address-dns-name "$VmName-dc" --private-ip-address "10.0.0.5" --admin-username $Username --admin-password $AdminPassword --only-show-errors | ConvertFrom-Json
 
     $domainLength = if("$DomainName".Split('.')[0].Length -gt 15) { 15 } Else { "$DomainName".Split('.')[0].Length }
     $NetBiosName = $DomainName.Split('.')[0].Substring(0,$domainLength)
     # Install AD DS role on the first VM and promote it to a domain controller
     az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    Import-Module NetTCPIP
+    $InterfaceIndex = (Get-NetAdapter -Name "Ethernet").ifIndex
+    Remove-NetIPAddress -InterfaceIndex $InterfaceIndex -IPAddress "10.0.0.5"
+    New-NetIPAddress -InterfaceIndex $InterfaceIndex -IPAddress "10.0.0.5" -PrefixOrigin Manual -SuffixOrigin Manual -DefaultGateway 10.0.0.1 -PrefixLength 24
+"@
+
+    az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
         Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
+        Install-WindowsFeature -Name DNS -IncludeManagementTools
         Import-Module ADDSDeployment
         Install-ADDSForest -DomainName "$DomainName" -DomainNetbiosName "$NetBiosName" -InstallDns -Force
         Install-ADDSDomainController -Credential (New-Object System.Management.Automation.PSCredential("$Username", (ConvertTo-SecureString "$AdminPassword" -AsPlainText -Force))) -DomainName "$DomainName" -InstallDns -Force
 "@
 
+    exit 1
+
     # Create AD Users and groups
-    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
     Import-Module ActiveDirectory
     New-ADUser -Name $Username -AccountPassword (ConvertTo-SecureString "$Password" -AsPlainText -Force) -Enabled $true -PasswordNeverExpires $true -ChangePasswordAtLogon $false -Path "CN=Users,DC=$DomainName" -SamAccountName $Username -UserPrincipalName "$Username@$DomainName"
     New-ADGroup -Name $GroupName -GroupCategory Security -GroupScope Global -Path "CN=Users,DC=$DomainName" -SamAccountName $GroupName
@@ -66,14 +88,20 @@ Function New-ADDCVM {
 "@
 
     # Create a GMSA account
-    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
     Add-KdsRootKey -EffectiveTime (Get-Date).AddHours(-10)
     New-ADServiceAccount FsGmsa -DNSHostName adfs.$DomainName -ServicePrincipalNames http/adfs.$DomainName
 "@
 
     # Install Federation Server 
-    az vm run-command invoke --comand-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
+    az vm run-command invoke --command-id RunPowerShellScript --resource-group $resourceGroup --name $winName --scripts @"
     Install-WindowsFeature ADFS-Federation -IncludeManagementTools
 "@
 }
 #endregion ADFS Functions
+@"
+Import-Module NetTCPIP
+$InterfaceIndex = (Get-NetAdapter -Name "Ethernet").ifIndex
+Remove-NetIPAddress -InterfaceIndex $InterfaceIndex -IPAddress "10.0.0.5"
+Remove-NetIPAddress -InterfaceIndex $InterfaceIndex -IPAddress "10.0.0.5" -PrefixOrigin Manual -SuffixOrigin Manual -DefaultGateway 10.0.0.1 -PrefixLength 24
+"@
