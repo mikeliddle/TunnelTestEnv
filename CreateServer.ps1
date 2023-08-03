@@ -151,7 +151,11 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [switch]$UseInspection
+    [switch]$UseInspection,
+
+    [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [switch]$UseAllowList
 )
 
 $script:SSHKeyPath = ""
@@ -294,13 +298,8 @@ Function New-TunnelEnvironment {
 
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
-        if ($UseInspection) {
-            Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection
-            Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection
-        } else {
-            Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
-            Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
-        }
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList
+        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
     }
 
     # Create Certificates
