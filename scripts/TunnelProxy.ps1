@@ -100,7 +100,7 @@ Function Initialize-Proxy {
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$ExcludeDomainFile.tmp" "$($Username)@$("$($ProxyVMData.fqdns)"):~/ssl_exclude_domains" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "proxy/ssl_exclude_ips" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$ProxyVMData"):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$pacFile" "$($Username)@$("$($ProxyVMData.fqdns)"):~/" > $null
 
     if ($AuthenticatedProxyCredentials) {
         scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$passwordsFile" "$($Username)@$("$($ProxyVMData.fqdns)"):~/passwords" > $null
@@ -124,7 +124,7 @@ Function Invoke-ProxyScript {
     $flags = ""
     if ($UseInspection) {
         $flags += " -b"
-    } 
+    }
     if ($AuthenticatedProxyCredentials) {
         $flags += " -a"
     }
