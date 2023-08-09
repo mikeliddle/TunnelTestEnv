@@ -421,6 +421,16 @@ Function New-Summary {
         Write-Success ""
     }
 
+    if ($IncludeRoutes.Count -gt 0) {
+        Write-Success "Routes to include: $($IncludeRoutes -join ', ')"
+        Write-Success ""
+    }
+
+    if ($ExcludeRoutes.Count -gt 0) {
+        Write-Success "Routes to exclude: $($ExcludeRoutes -join ', ')"
+        Write-Success ""
+    }
+
     if (!$NoProxy) {
         Write-Success "PAC URL: http://$($TunnelVM.fqdns)/proxy.pac"
         Write-Success "Proxy Hostname: proxy.$($TunnelVM.fqdns)"
