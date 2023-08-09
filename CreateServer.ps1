@@ -486,6 +486,8 @@ Function Remove-TempFiles {
     Remove-Item nginx.conf.d/nginx.conf.tmp
     Remove-Item cacert.pem.tmp
     Remove-Item scripts/*.tmp
+    Remove-Item agent.p12
+    Remove-Item agent-info.json
 }
 
 Function New-ProfilesOnlyEnvironment {
