@@ -353,6 +353,8 @@ Function New-TunnelEnvironment {
     New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
 
     New-Profiles
+
+    New-Summary
     
     if (!$StayLoggedIn) {
         Logout
@@ -409,6 +411,16 @@ Function New-Summary {
     Write-Success "Tunnel Server Address: $($TunnelVM.fqdns)"
     Write-Success ""
 
+    if (!$SprintSignoff) {
+        Write-Success "Profiles targeted to $($Group.displayName)"
+        Write-Success ""
+    }
+
+    if ($BundleIds.Count -gt 0) {
+        Write-Success "Targeted App Bundle IDs for MAM: $($BundleIds -join ', ')"
+        Write-Success ""
+    }
+
     if (!$NoProxy) {
         Write-Success "PAC URL: http://$($TunnelVM.fqdns)/proxy.pac"
         Write-Success "Proxy Hostname: proxy.$($TunnelVM.fqdns)"
@@ -461,9 +473,19 @@ Function Remove-TunnelEnvironment {
     Remove-TunnelSite -SiteName $VmName
     Remove-TunnelConfiguration -ServerConfigurationName $VmName
 
+    Remove-TempFiles
+
     if (!$StayLoggedIn) {
         Logout
     }
+}
+
+Function Remove-TempFiles {
+    Remove-Item proxy/*.tmp
+    Remove-Item nginx_data/tunnel.pac.tmp
+    Remove-Item nginx.conf.d/nginx.conf.tmp
+    Remove-Item cacert.pem.tmp
+    Remove-Item scripts/*.tmp
 }
 
 Function New-ProfilesOnlyEnvironment {
