@@ -72,6 +72,10 @@ while getopts ":e:d:" opt; do
         e)
             EMAIL=$OPTARG
             ;;
+        h)
+            Usage
+            exit 0
+            ;;
         \?)
             Usage
             exit 1

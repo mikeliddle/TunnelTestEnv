@@ -177,6 +177,10 @@ while getopts ":awnd:e:" opt; do
         n)
             Nginx=true
             ;;
+        h)
+            Usage
+            exit 0
+            ;;
         \?)
             Usage
             exit 1

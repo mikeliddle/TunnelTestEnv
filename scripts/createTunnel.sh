@@ -13,9 +13,11 @@ LogWarning() {
 }
 
 Usage() {
-    echo "Usage: $0 "
+    echo "Usage: $0 -c <cert_file> -k <key_file>"
     echo "Example: $0 "
     echo "Options:"
+    echo "  -c <cert_file>: path to cert file"
+    echo "  -k <key_file>: path to key file"
     echo "  -h: Show this help message"
     exit 1
 }
