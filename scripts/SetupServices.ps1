@@ -43,10 +43,19 @@ Function New-NginxSetup {
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx.conf.d "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx_data "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./sampleWebService "$($Username)@$($ServiceVMDNS):~/" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/getPublicCert.sh "$($Username)@$($TunnelVMDNS):~/" > $null
 
+    Write-Header "Getting public certificate"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS)" "chmod +x ~/getPublicCert.sh"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS)" "sudo ./getPublicCert.sh -e $Email -d $TunnelVMDNS"
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS):~/letsencrypt.pem" ./letsencrypt.pem.tmp > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS):~/letsencrypt.key" ./letsencrypt.key.tmp > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./letsencrypt.pem.tmp "$($Username)@$($TunnelVMDNS):~/letsencrypt.pem" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./letsencrypt.key.tmp "$($Username)@$($TunnelVMDNS):~/letsencrypt.key" > $null
+    
     Write-Header "Install and run Containers"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/createWebservers.sh"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a -d $ServiceVMDNS -e $Email"
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a"   
 }
 
 Function New-DnsServer {

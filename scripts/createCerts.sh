@@ -202,6 +202,10 @@ while getopts ":rsuixc:a:" opt; do
         a)
             altNames="$OPTARG"
             ;;
+        h)
+            Usage
+            exit 0
+            ;;
         \?)
             Usage
             exit 1

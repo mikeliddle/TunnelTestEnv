@@ -12,6 +12,17 @@ LogWarning() {
     echo -e "\e[0;33m$1\e[0m"
 }
 
+Usage() {
+    echo "Usage: $0 -abu"
+    echo "Example: $0"
+    echo "Options:"
+    echo "  -a: use an authenticated proxy"
+    echo "  -b: setup TLS inspection on the proxy"
+    echo "  -u: uninstall proxy"
+    echo "  -h: Show this help message"
+    exit 1
+}
+
 InstallPrereqs() {
     LogInfo "Installing prerequisites..."
     maxRetries=3
@@ -137,8 +148,12 @@ while getopts "abu" opt; do
             Uninstall
             exit 0
             ;;
+        h)
+            Usage
+            exit 0
+            ;;
         \?)
-            LogError "Invalid option: -$OPTARG" >&2
+            Usage
             exit 1
             ;;
     esac
