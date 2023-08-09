@@ -104,8 +104,10 @@ Function New-AdvancedNetworkRules {
         [string] $resourceGroup,
         [string] $ProxyIP,
         [string] $VmName,
-        [string] $WithSSHOpen = $false
+        [bool] $WithSSHOpen = $false
     )
+
+    Write-Header "Creating network rules..."
 
     if ($WithSSHOpen) {
         az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowSSHIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
