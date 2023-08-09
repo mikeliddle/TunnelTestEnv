@@ -16,6 +16,9 @@ Usage() {
     echo "Usage: $0 "
     echo "Example: $0 "
     echo "Options:"
+    echo "  -a: setup both webapps and nginx server"
+    echo "  -w: setup webapps"
+    echo "  -n: setup nginx server"
     echo "  -h: Show this help message"
     exit 1
 }
@@ -53,14 +56,14 @@ SetupPrereqs() {
         fi
     fi
 
-    if [ ! -d ./acme.sh ]; then
-        LogInfo "Installing acme.sh"
-        curl https://get.acme.sh | sh -s email=$EMAIL >> install.log 2>&1
+    if [ ! -f ./letsencrypt.pem ]; then
+        LogError "missing letsencrypt certificate"
+        exit 1
+    fi
 
-        if [ $? -ne 0 ]; then
-            LogError "Failed to install acme.sh"
-            exit 1
-        fi
+    if [ ! -f ./letsencrypt.key ]; then
+        LogError "missing letsencrypt key"
+        exit 1
     fi
 }
 
@@ -153,25 +156,13 @@ SetupWebApps() {
 }
 
 SetupAcmesh() {
-    current_dir=$(pwd)
-    ~/.acme.sh/acme.sh --upgrade  >> certs.log 2>&1
-    ~/.acme.sh/acme.sh --set-default-ca --server letsencrypt  >> certs.log 2>&1
-    ~/.acme.sh/acme.sh --register-account  >> certs.log 2>&1
-
-    ~/.acme.sh/acme.sh --upgrade --update-account --accountemail $EMAIL  >> certs.log 2>&1
-
-    ~/.acme.sh/acme.sh --issue --alpn -d $DOMAIN_NAME --preferred-chain "ISRG ROOT X1" --keylength 4096  >> certs.log 2>&1
-
-    cp ~/.acme.sh/$DOMAIN_NAME/fullchain.cer /etc/pki/tls/certs/letsencrypt.pem  >> certs.log 2>&1
-    cp ~/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key /etc/pki/tls/private/letsencrypt.key  >> certs.log 2>&1
+    cp ./letsencrypt.pem /etc/pki/tls/certs/letsencrypt.pem  >> certs.log 2>&1
+    cp ./letsencrypt.key /etc/pki/tls/private/letsencrypt.key  >> certs.log 2>&1
 
     if [ $? -ne 0 ]; then
         LogError "Failed to setup LetsEncrypt cert"
-        cd $current_dir
         exit 1
     fi
-
-    cd $current_dir
 }
 
 while getopts ":awnd:e:" opt; do
@@ -186,11 +177,9 @@ while getopts ":awnd:e:" opt; do
         n)
             Nginx=true
             ;;
-        d)
-            DOMAIN_NAME=$OPTARG
-            ;;
-        e)
-            EMAIL=$OPTARG
+        h)
+            Usage
+            exit 0
             ;;
         \?)
             Usage
@@ -206,16 +195,6 @@ done
 SetupPrereqs
 
 if [ "$Nginx" = true ]; then
-    if [ -z "$DOMAIN_NAME" ]; then
-        LogError "Domain name is required"
-        exit 1
-    fi
-
-    if [ -z "$EMAIL" ]; then
-        LogError "Email is required"
-        exit 1
-    fi
-
     SetupAcmesh
     SetupNginx
 fi
