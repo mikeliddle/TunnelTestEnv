@@ -1,6 +1,7 @@
 [cmdletbinding(DefaultParameterSetName="Create")]
 param(
     [Parameter(Mandatory=$true, ParameterSetName="Create")]
+    [Parameter(Mandatory=$true, ParameterSetName="SprintSignoff")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$true, ParameterSetName="Delete")]
     [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
@@ -24,6 +25,7 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","westus3","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
     [string]$Location="westus",
 
@@ -33,40 +35,49 @@ param(
     [string]$Environment="PE",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [string]$Email="",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [string]$Username="azureuser",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [string]$Size = "Standard_B2s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [string]$ProxySize = "Standard_B2s",
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
     
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$RHEL8,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$RHEL7,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$Centos7,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$Simple,    
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -77,11 +88,13 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [string]$SubscriptionId,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$NoProxy,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -90,14 +103,18 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [pscredential[]]$AuthenticatedProxyCredentials,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
     [switch]$NoPki,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [pscredential]$VmTenantCredential,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -117,10 +134,12 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="Delete")]
     [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$StayLoggedIn,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$WithSSHOpen,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
@@ -141,6 +160,9 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [switch]$WithADFS,
 
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [switch]$SprintSignoff,
+
     [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
     [string]$DomainName,
 
@@ -151,10 +173,12 @@ param(
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$UseInspection,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
     [switch]$UseAllowList
 )
 
@@ -237,8 +261,8 @@ Function Initialize-Variables {
         $script:PACUrl = "http://$FQDN/tunnel.pac"
     }
 
-    if (-Not $Delete) {
-        # We only need a group name for the create flow
+    if (-Not $Delete -And -Not $SprintSignoff) {
+        # We only need a group name for the create and profile flows
         $script:Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
         if (-Not $Group) {
             Write-Error "Could not find group named '$GroupName'"
@@ -335,6 +359,94 @@ Function New-TunnelEnvironment {
     }
 }
 
+Function New-SprintSignoffEnvironment {
+    Login-Azure -SubscriptionId $SubscriptionId -VmTenantCredential $VmTenantCredential
+    Initialize-Variables
+    New-SSHKeys $SSHKeyPath
+
+    $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
+    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
+    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
+
+    $ServiceVMName = "$VmName-server"
+    $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+
+    if (-Not $Simple) {
+        New-AdvancedNetworkRules -resourceGroup $ResourceGroup.name -ProxyIP $ProxyIP -VmName $VmName -WithSSHOpen $WithSSHOpen
+    } else {
+        New-NetworkRules -resourceGroup $ResourceGroup.name -VmName $VmName -WithSSHOpen $WithSSHOpen
+    }
+
+    if (!$NoProxy) {
+        # Setup Proxy server on Service VM
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList
+        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
+    }
+
+    # Create Certificates
+    New-BasicPki -ServiceVMDNS $ServiceVM.fqdns -TunnelVMDNS $TunnelVm.fqdns -Username $Username -SSHKeyPath $SSHKeyPath
+
+    # Setup DNS
+    New-DnsServer -TunnelVMDNS $TunnelVM.fqdns -ProxyIP $ProxyIP -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns
+    # Setup WebServers
+    New-NginxSetup -TunnelVMDNS $TunnelVM.fqdns -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns -Email $Email -ServerIp $ProxyIP
+
+    Update-RebootVM -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+
+    New-Summary
+
+    if (!$StayLoggedIn) {
+        az logout
+    }
+}
+
+Function New-Summary {
+    Write-Success "=====================Summary====================="
+    
+    Write-Success "VM Username: $Username"
+    Write-Success "VM SSH Key: $SSHKeyPath"
+    Write-Success ""
+    Write-Success "Tunnel Server Address: $($TunnelVM.fqdns)"
+    Write-Success ""
+
+    if (!$NoProxy) {
+        Write-Success "PAC URL: http://$($TunnelVM.fqdns)/proxy.pac"
+        Write-Success "Proxy Hostname: proxy.$($TunnelVM.fqdns)"
+        Write-Success "Proxy Port: 3128"
+        Write-Success ""
+        Write-Success "These URLS Bypass the proxy when using a PAC file: "
+        Write-Success "  www.google.com"
+        Write-Success "  excluded.$($TunnelVM.fqdns)"
+        Write-Success ""
+        
+        if ($UseAllowList) {
+            Write-Success "Proxy is configured for TLS Inspection"
+        }
+
+        if ($UseAllowList) {
+            Write-Success "Only the following URLs are allowed through the proxy:"
+            $Allowlist = Get-Content -Path "proxy\allowlist.tmp"
+            Write-Success $Allowlist
+        }
+    }
+    Write-Success ""
+    Write-Success "DNS Server: $ProxyIP"
+    Write-Success "Default Search Suffix: $($TunnelVM.fqdns)"
+    Write-Success ""
+    Write-Success "Internal Endpoints: "
+    Write-Success "  http://$ProxyIP - most stable for reachability check"
+    Write-Success "  https://webapp or https://webapp.$($TunnelVM.fqdns) - When using a proxy, this should show your IP as $ProxyIP"
+    Write-Success "  https://excluded or https://excluded.$($TunnelVM.fqdns) - When using a proxy, this should show you a different IP than above"
+    Write-Success "  https://trusted or https://trusted.$($TunnelVM.fqdns)"
+    Write-Success "  https://$($TunnelVM.fqdns) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
+    Write-Success "  https://untrusted or https://untrusted.$($TunnelVM.fqdns) - This endpoint should give you a certificate error"
+    Write-Success ""
+    Write-Success "Trusted Certificate Path: cacert.pem.tmp"
+    Write-Success "You will need to rename and upload that certificate to Intune as a trusted certificate."
+    Write-Success "The certificate is also printed out above."
+    Write-Success "================================================="
+}
+
 Function Remove-TunnelEnvironment {
     Login
     Initialize-Variables
@@ -406,6 +518,8 @@ if ($Delete) {
     } else {
         Remove-TunnelEnvironment
     }
+} elseif ($SprintSignoff) {
+    New-SprintSignoffEnvironment
 } else {
     if ($ProfilesOnly) {
         New-ProfilesOnlyEnvironment

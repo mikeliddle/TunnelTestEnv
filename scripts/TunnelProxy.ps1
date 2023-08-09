@@ -112,8 +112,10 @@ Function Initialize-Proxy {
     }
     finally {
         # Clean up any passwords file if it is present
-        if (Test-Path $passwordsFile) {
-            Remove-Item $passwordsFile
+        if ($passwordsFile) {
+            if (Test-Path $passwordsFile) {
+                Remove-Item $passwordsFile
+            }
         }
     }
 }
