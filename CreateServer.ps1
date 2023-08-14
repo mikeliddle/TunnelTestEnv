@@ -104,7 +104,7 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [pscredential[]]$AuthenticatedProxyCredentials,
+    [pscredential[]]$AuthenticatedProxyCredentials=$null,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
@@ -322,7 +322,7 @@ Function New-TunnelEnvironment {
 
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
-        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
         Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
     }
 
@@ -381,7 +381,7 @@ Function New-SprintSignoffEnvironment {
 
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
-        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
         Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
     }
 
