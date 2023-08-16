@@ -307,6 +307,8 @@ Function New-TunnelEnvironment {
     Initialize-Variables
     New-SSHKeys $SSHKeyPath
 
+    New-ServicePrincipal -AADEnvironment Environment
+
     $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
     $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
     $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name

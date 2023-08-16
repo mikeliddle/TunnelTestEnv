@@ -63,7 +63,7 @@ Switches:
 - `-WithADFS` - Configure ADFS in the environment. This is a WIP and is not fully functional yet.
 - `-RHEL8` - Uses the RHEL 8 lvm image for the Tunnel VM.
 - `-RHEL7` - Uses the RHEL 7 lvm image for the Tunnel VM.
-- `-Centos7` - Uses the Centos 7 lvm image for the Tunnel VM.
+- `-Centos7` - Uses the Centos 7.9 image from OpenLogic for the Tunnel VM.
 
 ## Environment explanation
 

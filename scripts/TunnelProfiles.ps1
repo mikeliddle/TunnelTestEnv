@@ -144,6 +144,34 @@ Function Update-PrivateDNSAddress {
 }
 #endregion Tunnel Server Profiles
 
+#region App Registration Setup
+Function New-ServicePrincipal {
+    param(
+        [String]$AADEnvironment
+    )
+
+    $TunnelServicePrincipal = Get-MgServicePrincipal -Filter "DisplayName eq 'Microsoft Tunnel Gateway'"
+    if ($TunnelServicePrincipal) {
+        return
+    }
+
+    Write-Header "Provisioning Service Principal for Microsoft Tunnel Gateway..."
+
+    try {
+        $appId = "3678c9e9-9681-447a-974d-d19f668fcd88"
+
+        New-MgServicePrincipal -AppId $appId
+        
+        Write-Host "Successfully provisioned the Service Principal" -ForegroundColor Green
+    } catch [Exception] {
+        Write-Error "Error provisioning Service Principal"
+        Write-Host $_.Exception.GetType().FullName, $_.Exception.Message
+        Write-Host "Failed to provision the Service Principal" -ForegroundColor Red
+        exit 1
+    }
+}
+#endregion
+
 #region iOS MAM Specific Functions
 Function Update-ADApplication {
     param(
