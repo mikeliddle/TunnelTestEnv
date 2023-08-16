@@ -55,6 +55,25 @@ Function Remove-SSHKeys {
     ssh-keygen -R $ServiceFQDN
 }
 
+Function Remove-TempFiles {
+    Remove-ItemIfExists -Path proxy/*.tmp
+    Remove-ItemIfExists -Path nginx_data/tunnel.pac.tmp
+    Remove-ItemIfExists -Path nginx.conf.d/nginx.conf.tmp
+    Remove-ItemIfExists -Path cacert.pem.tmp
+    Remove-ItemIfExists -Path scripts/*.tmp
+    Remove-ItemIfExists -Path agent.p12
+    Remove-ItemIfExists -Path agent-info.json
+}
+
+Function Remove-ItemIfExists {
+    param(
+        [string] $Path
+    )
+    if (Test-Path $Path) {
+        Remove-Item -Path $Path -Force
+    }
+}
+
 Function New-RandomPassword {
     # Define the character sets to use for the password
     $lowercaseLetters = "abcdefghijklmnopqrstuvwxyz"

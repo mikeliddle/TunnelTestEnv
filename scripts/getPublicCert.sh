@@ -59,6 +59,8 @@ CopyAndPrintCertificate() {
     LogInfo "Copying certificate to current directory"
     cp ~/.acme.sh/$DOMAIN_NAME/fullchain.cer ./letsencrypt.pem
     cp ~/.acme.sh/$DOMAIN_NAME/$DOMAIN_NAME.key ./letsencrypt.key
+    chmod 777 ./letsencrypt.pem
+    chmod 777 ./letsencrypt.key
 
     LogInfo "Printing certificate"
     cat ./letsencrypt.pem

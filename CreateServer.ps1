@@ -104,7 +104,7 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [pscredential[]]$AuthenticatedProxyCredentials,
+    [pscredential[]]$AuthenticatedProxyCredentials=$null,
 
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
@@ -307,6 +307,8 @@ Function New-TunnelEnvironment {
     Initialize-Variables
     New-SSHKeys $SSHKeyPath
 
+    New-ServicePrincipal -AADEnvironment Environment
+
     $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
     $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
     $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
@@ -322,7 +324,7 @@ Function New-TunnelEnvironment {
 
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
-        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
         Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
     }
 
@@ -381,7 +383,7 @@ Function New-SprintSignoffEnvironment {
 
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
-        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList
+        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
         Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
     }
 
@@ -441,17 +443,19 @@ Function New-Summary {
         Write-Success "  excluded.$($TunnelVM.fqdns)"
         Write-Success ""
         
-        if ($UseAllowList) {
+        if ($UseInspection) {
             Write-Success "Proxy is configured for TLS Inspection"
+            Write-Success ""
         }
 
         if ($UseAllowList) {
             Write-Success "Only the following URLs are allowed through the proxy:"
             $Allowlist = Get-Content -Path "proxy\allowlist.tmp"
             Write-Success $Allowlist
+            Write-Success ""
         }
     }
-    Write-Success ""
+
     Write-Success "DNS Server: $ProxyIP"
     Write-Success "Default Search Suffix: $($TunnelVM.fqdns)"
     Write-Success ""
@@ -462,10 +466,14 @@ Function New-Summary {
     Write-Success "  https://trusted or https://trusted.$($TunnelVM.fqdns)"
     Write-Success "  https://$($TunnelVM.fqdns) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
     Write-Success "  https://untrusted or https://untrusted.$($TunnelVM.fqdns) - This endpoint should give you a certificate error"
-    Write-Success ""
-    Write-Success "Trusted Certificate Path: cacert.pem.tmp"
-    Write-Success "You will need to rename and upload that certificate to Intune as a trusted certificate."
-    Write-Success "The certificate is also printed out above."
+
+    if ($SprintSignoff) {
+        Write-Success ""
+        Write-Success "Trusted Certificate Path: cacert.pem.tmp"
+        Write-Success "You will need to rename and upload that certificate to Intune as a trusted certificate."
+        Write-Success "The certificate is also printed out above."
+    }
+
     Write-Success "================================================="
 }
 
@@ -488,16 +496,6 @@ Function Remove-TunnelEnvironment {
     if (!$StayLoggedIn) {
         Logout
     }
-}
-
-Function Remove-TempFiles {
-    Remove-Item proxy/*.tmp
-    Remove-Item nginx_data/tunnel.pac.tmp
-    Remove-Item nginx.conf.d/nginx.conf.tmp
-    Remove-Item cacert.pem.tmp
-    Remove-Item scripts/*.tmp
-    Remove-Item agent.p12
-    Remove-Item agent-info.json
 }
 
 Function New-ProfilesOnlyEnvironment {

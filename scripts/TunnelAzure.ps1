@@ -31,8 +31,14 @@ Function Login-Azure {
 
         Write-Header "Setting subscription to $SubscriptionId"
         az account set --subscription $SubscriptionId | Out-Null
+    } elseif ($accounts[0].id -ne $SubscriptionId) {
+        Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
+        Write-Warning "If you don't want to use this account, please logout, then run this script again."
+        Write-Header "Setting subscription to $SubscriptionId"
+        az account set --subscription $SubscriptionId | Out-Null
     } else {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
+        Write-Warning "Using subscription $($accounts[0].id)"
         Write-Warning "If you don't want to use this account, please logout, then run this script again."
     }
 }
