@@ -50,8 +50,8 @@ Function New-NginxSetup {
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS)" "sudo ./getPublicCert.sh -e $Email -d $TunnelVMDNS"
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS):~/letsencrypt.pem" ./letsencrypt.pem.tmp > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($TunnelVMDNS):~/letsencrypt.key" ./letsencrypt.key.tmp > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./letsencrypt.pem.tmp "$($Username)@$($TunnelVMDNS):~/letsencrypt.pem" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./letsencrypt.key.tmp "$($Username)@$($TunnelVMDNS):~/letsencrypt.key" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./letsencrypt.pem.tmp "$($Username)@$($ServiceVMDNS):~/letsencrypt.pem" > $null
+    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./letsencrypt.key.tmp "$($Username)@$($ServiceVMDNS):~/letsencrypt.key" > $null
     
     Write-Header "Install and run Containers"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/createWebservers.sh"

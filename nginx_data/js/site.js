@@ -1,11 +1,40 @@
 const uri = 'api/todoitems';
 let todos = [];
+let ajaxEnabled = false;
+
+document.addEventListener('DOMContentLoaded', function () {
+  var checkbox = document.querySelector('input[type="checkbox"]');
+
+  checkbox.addEventListener('change', function () {
+    toggleAJAX();
+  });
+});
+
+function getIPAddress() {
+  fetch("api/IPAddress")
+    .then(response => response.json())
+    .then(data => document.getElementById("ip_address_span").innerHTML=data["ipAddress"])
+    .catch(error => console.error("unable to get ip address.", error));
+}
 
 function getItems() {
-  fetch(uri)
-    .then(response => response.json())
-    .then(data => _displayItems(data))
-    .catch(error => console.error('Unable to get items.', error));
+  if (ajaxEnabled) {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        _displayItems(JSON.parse(xhr.response));
+      } else {
+        console.error('Unable to get items.');
+      }
+    }
+    xhr.open('GET', uri);
+    xhr.send();
+  } else {
+    fetch(uri)
+      .then(response => response.json())
+      .then(data => _displayItems(data))
+      .catch(error => console.error('Unable to get items.', error));
+  }
 }
 
 function addItem() {
@@ -16,28 +45,56 @@ function addItem() {
     name: addNameTextbox.value.trim()
   };
 
-  fetch(uri, {
-    method: 'POST',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(item)
-  })
-    .then(response => response.json())
-    .then(() => {
-      getItems();
-      addNameTextbox.value = '';
+  if (ajaxEnabled) {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        getItems();
+        addNameTextbox.value = '';
+      } else {
+        console.error('Unable to add item.');
+      }
+    }
+    xhr.open('POST', uri);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify(item));
+  } else {
+    fetch(uri, {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(item)
     })
-    .catch(error => console.error('Unable to add item.', error));
+      .then(response => response.json())
+      .then(() => {
+        getItems();
+        addNameTextbox.value = '';
+      })
+      .catch(error => console.error('Unable to add item.', error));
+  }
 }
 
 function deleteItem(id) {
-  fetch(`${uri}/${id}`, {
-    method: 'DELETE'
-  })
-  .then(() => getItems())
-  .catch(error => console.error('Unable to delete item.', error));
+  if (ajaxEnabled) {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        getItems();
+      } else {
+        console.error('Unable to delete item.');
+      }
+    }
+    xhr.open('DELETE', `${uri}/${id}`);
+    xhr.send();
+  } else {
+    fetch(`${uri}/${id}`, {
+      method: 'DELETE'
+    })
+    .then(() => getItems())
+    .catch(error => console.error('Unable to delete item.', error));
+  }
 }
 
 function displayEditForm(id) {
@@ -57,16 +114,30 @@ function updateItem() {
     name: document.getElementById('edit-name').value.trim()
   };
 
-  fetch(`${uri}/${itemId}`, {
-    method: 'PUT',
-    headers: {
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(item)
-  })
-  .then(() => getItems())
-  .catch(error => console.error('Unable to update item.', error));
+  if (ajaxEnabled) {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function () {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        getItems();
+      } else {
+        console.error('Unable to update item.');
+      }
+    }
+    xhr.open('PUT', `${uri}/${itemId}`);
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    xhr.send(JSON.stringify(item));
+  } else {
+    fetch(`${uri}/${itemId}`, {
+      method: 'PUT',
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(item)
+    })
+    .then(() => getItems())
+    .catch(error => console.error('Unable to update item.', error));
+  }
 
   closeInput();
 
@@ -81,6 +152,14 @@ function _displayCount(itemCount) {
   const name = (itemCount === 1) ? 'to-do' : 'to-dos';
 
   document.getElementById('counter').innerText = `${itemCount} ${name}`;
+}
+
+function toggleAJAX() {
+  if (ajaxEnabled) {
+    ajaxEnabled = false;
+  } else {
+    ajaxEnabled = true;
+  }
 }
 
 function _displayItems(data) {
