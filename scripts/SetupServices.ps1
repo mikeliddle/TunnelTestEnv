@@ -38,6 +38,16 @@ Function New-NginxSetup {
     $Content = $Content -replace "##SERVER_IP##", "$ServerIP"
     Set-Content -Path ./nginx.conf.d/nginx.conf.tmp -Value $Content -Force
 
+    $Content = Get-Content ./sampleWebService/wwwroot/js/site.js
+    
+    if ($ServerIP) {
+        $Content = $Content -replace "##PROXY_IP##", "$ServerIP"
+    } else {
+        $Content = $Content -replace "##PROXY_IP##", "xx.xx.xx.xx" # this doesn't really matter, it just won't ever match the proxy IP if there's not a proxy.
+    }
+
+    Set-Content -Path ./sampleWebService/wwwroot/js/site.js -Value $Content -Force
+
     Write-Header "Copying files over"
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/createWebservers.sh "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx.conf.d "$($Username)@$($ServiceVMDNS):~/" > $null

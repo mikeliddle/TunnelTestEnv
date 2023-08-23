@@ -13,7 +13,13 @@ document.addEventListener('DOMContentLoaded', function () {
 function getIPAddress() {
   fetch("api/IPAddress")
     .then(response => response.json())
-    .then(data => document.getElementById("ip_address_span").innerHTML=data["ipAddress"])
+    .then(data => {
+      if (data["ipAddress"] == "10.0.0.5") {
+        document.getElementById("ip_address_span").innerHTML=data["ipAddress"] + " (Proxy)";
+      } else {
+        document.getElementById("ip_address_span").innerHTML=data["ipAddress"] + " (Not Proxy)";
+      }        
+    })
     .catch(error => console.error("unable to get ip address.", error));
 }
 
