@@ -434,7 +434,7 @@ Function New-Summary {
     }
 
     if (!$NoProxy) {
-        Write-Success "PAC URL: http://$($TunnelVM.fqdns)/proxy.pac"
+        Write-Success "PAC URL: http://$($TunnelVM.fqdns)/tunnel.pac"
         Write-Success "Proxy Hostname: proxy.$($TunnelVM.fqdns)"
         Write-Success "Proxy Port: 3128"
         Write-Success ""
