@@ -117,16 +117,16 @@ Function New-AdvancedNetworkRules {
 
     if ($WithSSHOpen) {
         az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowSSHIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowRDPIn" --priority 104 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
+        # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowRDPIn" --priority 104 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
     }
 
     az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowHTTPSIn" --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
-    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowOutboundProxy" --priority 102 --source-address-prefixes "$ProxyIP" --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --access Allow --protocol '*' --description "Allow Proxy Outbound Traffic" > $null
-    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "DenyOutboundNoProxy" --priority 103 --source-address-prefixes '10.0.0.0/8' --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --access Deny --protocol '*' --description "Deny All Outbound Traffic" > $null
+    # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowOutboundProxy" --priority 102 --source-address-prefixes "$ProxyIP" --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --access Allow --protocol '*' --description "Allow Proxy Outbound Traffic" > $null
+    # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "DenyOutboundNoProxy" --priority 103 --source-address-prefixes '10.0.0.0/8' --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --access Deny --protocol '*' --description "Deny All Outbound Traffic" > $null
 
     if ($WithSSHOpen) {
         az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowSSHIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowRDPIn" --priority 104 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
+        # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowRDPIn" --priority 104 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
     }
 
     az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowHTTPSIn" --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
