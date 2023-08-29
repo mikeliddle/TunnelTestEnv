@@ -14,11 +14,12 @@ LogWarning() {
 
 Usage() {
     echo "Usage: $0 "
-    echo "Example: $0 "
+    echo "Example: $0 -a -p 10.0.0.5 "
     echo "Options:"
     echo "  -a: setup both webapps and nginx server"
     echo "  -w: setup webapps"
     echo "  -n: setup nginx server"
+    echo "  -p: proxy ip address"
     echo "  -h: Show this help message"
     exit 1
 }
@@ -104,52 +105,28 @@ SetupNginx() {
 
 SetupWebApps() {
     LogInfo "Setting up .NET web service"
-    current_dir=$(pwd)
 
-    cd sampleWebService
-
-    $ctr_cli build -t samplewebservice . > webService.log
+    $ctr_cli image pull mliddle2/tunnelwebapp > webService.log
 
     $ctr_cli run -d \
-        --name=webApp \
+        --name=webapp \
         --restart=unless-stopped \
         -p 8081:80 \
         -p 8443:443 \
+        -e PROXY_IP=$PROXY_IP \
         -e ASPNETCORE_URLS="https://+;http://+" \
         -e ASPNETCORE_HTTPS_PORT=443 \
         -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
         -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/server.pfx \
         -v /etc/pki/tls/private:/https/ \
-        samplewebservice >> webService.log 2>&1
+        mliddle2/tunnelwebapp >> webService.log 2>&1
 
-    $ctr_cli run -d \
-        --name=excluded \
-        --restart=unless-stopped \
-        -p 8080:80 \
-        -p 9443:443 \
-        -e ASPNETCORE_URLS="https://+;http://+" \
-        -e ASPNETCORE_HTTPS_PORT=443 \
-        -e ASPNETCORE_Kestrel__Certificates__Default__Password="" \
-        -e ASPNETCORE_Kestrel__Certificates__Default__Path=/https/server.pfx \
-        -v /etc/pki/tls/private:/https/ \
-        samplewebservice >> webService.log 2>&1
-
-    cd $current_dir
-
-    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webApp)
+    WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webapp)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
+    sed -i "s/##EXCLUDED_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
 
-    EXCLUDED_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" excluded)
-    sed -i "s/##EXCLUDED_IP##/${EXCLUDED_IP}/g" *.d/*.conf
-
-    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webApp)
+    WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webapp)
     if [ "$WEBSERVICE_HEALTH" != "running" ]; then
-        LogError "Failed to setup .NET server container"
-        exit 1
-    fi
-
-    EXCLUDED_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" excluded)
-    if [ "$EXCLUDED_HEALTH" != "running" ]; then
         LogError "Failed to setup .NET server container"
         exit 1
     fi
@@ -165,7 +142,7 @@ SetupAcmesh() {
     fi
 }
 
-while getopts ":awnd:e:" opt; do
+while getopts ":awnp:e:" opt; do
     case $opt in
         a)
             WebApps=true
@@ -176,6 +153,9 @@ while getopts ":awnd:e:" opt; do
             ;;
         n)
             Nginx=true
+            ;;
+        p)
+            PROXY_IP=$OPTARG
             ;;
         h)
             Usage

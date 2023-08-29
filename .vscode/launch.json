@@ -5,39 +5,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": ".NET Core Launch (web)",
-            "type": "coreclr",
-            "request": "launch",
-            "preLaunchTask": "build",
-            "program": "${workspaceFolder}/sampleWebService/bin/Debug/net6.0/sampleWebService.dll",
-            "args": [],
-            "cwd": "${workspaceFolder}/sampleWebService",
-            "stopAtEntry": false,
-            "serverReadyAction": {
-                "action": "openExternally",
-                "pattern": "\\bNow listening on:\\s+(https?://\\S+)"
-            },
-            "env": {
-                "ASPNETCORE_ENVIRONMENT": "Development"
-            },
-            "sourceFileMap": {
-                "/Views": "${workspaceFolder}/Views"
-            }
-        },
-        {
-            "name": ".NET Core Attach",
-            "type": "coreclr",
-            "request": "attach"
-        },
-        {
-            "type": "PowerShell",
-            "request": "launch",
-            "name": "PowerShell Launch (current file)",
-            "script": "${file}",
-            "args": [],
-            "cwd": "${file}"
-        },
-        {
             "type": "PowerShell",
             "request": "attach",
             "name": "PowerShell Attach to Host Process",
