@@ -38,21 +38,10 @@ Function New-NginxSetup {
     $Content = $Content -replace "##SERVER_IP##", "$ServerIP"
     Set-Content -Path ./nginx.conf.d/nginx.conf.tmp -Value $Content -Force
 
-    $Content = Get-Content ./sampleWebService/wwwroot/js/site.js
-    
-    if ($ServerIP) {
-        $Content = $Content -replace "##PROXY_IP##", "$ServerIP"
-    } else {
-        $Content = $Content -replace "##PROXY_IP##", "xx.xx.xx.xx" # this doesn't really matter, it just won't ever match the proxy IP if there's not a proxy.
-    }
-
-    Set-Content -Path ./sampleWebService/wwwroot/js/site.js -Value $Content -Force
-
     Write-Header "Copying files over"
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/createWebservers.sh "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx.conf.d "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx_data "$($Username)@$($ServiceVMDNS):~/" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" -r ./sampleWebService "$($Username)@$($ServiceVMDNS):~/" > $null
     scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/getPublicCert.sh "$($Username)@$($TunnelVMDNS):~/" > $null
 
     Write-Header "Getting public certificate"
@@ -65,7 +54,7 @@ Function New-NginxSetup {
     
     Write-Header "Install and run Containers"
     ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "chmod +x ~/createWebservers.sh"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a"   
+    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($ServiceVMDNS)" "sudo ./createWebservers.sh -a -p $ServerIP"   
 }
 
 Function New-DnsServer {
