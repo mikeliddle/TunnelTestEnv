@@ -11,3 +11,6 @@
 .trusted
 .untrusted
 .excluded
+.fontawesome.com
+.cdn.jsdelivr.net
+.cdnjs.cloudflare.com
