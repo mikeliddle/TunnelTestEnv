@@ -85,7 +85,7 @@ Function New-Network {
 
     az network nsg create --name $NsgName --resource-group $resourceGroup --only-show-errors | Out-Null
     az network nsg rule create --nsg-name $NsgName --name "AllowSSHIN" --priority 1000 --resource-group $resourceGroup --access Allow --destination-port-ranges 22 --protocol Tcp --direction Inbound
-    az network nsg rule create --nsg-name $NsgName --name "AllowHTTPSIN" --priority 100 --resource-group $resourceGroup --access Allow --destination-port-ranges 443 --direction Inbound
+    az network nsg rule create --resource-group $resourceGroup --nsg-name $NsgName -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
 
     az network vnet create --name $VnetName --resource-group $resourceGroup
     az network vnet subnet create --network-security-group $NsgName --vnet-name $VnetName --name "$VnetName-subnet" --address-prefixes "10.0.0.0/24" --resource-group $resourceGroup
