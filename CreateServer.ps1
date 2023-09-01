@@ -325,7 +325,7 @@ Function New-TunnelEnvironment {
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
         Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
-        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
+        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
     }
 
     # Create Certificates
@@ -384,7 +384,7 @@ Function New-SprintSignoffEnvironment {
     if (!$NoProxy) {
         # Setup Proxy server on Service VM
         Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
-        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection
+        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
     }
 
     # Create Certificates
