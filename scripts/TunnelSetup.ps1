@@ -89,11 +89,11 @@ Function New-TunnelAgent {
     )
 
     if (-Not $TenantCredential) {
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id)"
+        $TenantCredential = Get-Credential -Message "Please enter your Intune Tenant credentials"
+        $Script:TenantCredential = $TenantCredential
     }
-    else {
-        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) $($TenantCredential.Username) $($TenantCredential.GetNetworkCredential().Password)"
-    }
+
+    $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
 
     return $JWT
 }

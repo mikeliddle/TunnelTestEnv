@@ -310,8 +310,9 @@ Function New-TunnelEnvironment {
     New-ServicePrincipal -AADEnvironment Environment
 
     $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
-    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
-    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
+    $TunnelVnet = New-Network -VmName $VmName -ResourceGroup $ResourceGroup.name
+    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
+    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
 
     $ServiceVMName = "$VmName-server"
     $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
@@ -369,8 +370,9 @@ Function New-SprintSignoffEnvironment {
     New-SSHKeys $SSHKeyPath
 
     $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
-    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
-    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name
+    $TunnelVnet = New-Network -VmName $VmName -ResourceGroup $ResourceGroup.name
+    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
+    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
 
     $ServiceVMName = "$VmName-server"
     $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name

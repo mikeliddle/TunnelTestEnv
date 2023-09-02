@@ -12,11 +12,11 @@ Function Login-Graph {
     } else {
         Write-Header "Logging into graph..."
         if (-Not $TenantCredential) {
-            Write-Header "Select the account to manage the profiles."
-            $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT"
-        } else {
-            $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT $($TenantCredential.Username) $($TenantCredential.GetNetworkCredential().Password)"
+            $TenantCredential = Get-Credential -Message "Please enter your Intune Tenant credentials"
+            $Script:TenantCredential = $TenantCredential
         }
+
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe JWT '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
         
         if (-Not $JWT) {
             Write-Error "Could not get JWT for account"

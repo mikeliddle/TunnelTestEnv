@@ -72,6 +72,25 @@ Function Remove-ResourceGroup {
     }
 }
 
+Function New-Network {
+    param (
+        [string] $VmName,
+        [string] $resourceGroup = "$VmName-group"
+    )
+
+    $NsgName="$VmName-VNET-NSG"
+    $VnetName="$VmName-VNET"
+
+    Write-Header "Creating network $VnetName..."
+
+    az network nsg create --name $NsgName --resource-group $resourceGroup --only-show-errors | Out-Null
+    az network nsg rule create --nsg-name $NsgName --name "AllowSSHIN" --priority 1000 --resource-group $resourceGroup --access Allow --destination-port-ranges 22 --protocol Tcp --direction Inbound
+    az network nsg rule create --resource-group $resourceGroup --nsg-name $NsgName -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
+
+    az network vnet create --name $VnetName --resource-group $resourceGroup
+    az network vnet subnet create --network-security-group $NsgName --vnet-name $VnetName --name "$VnetName-subnet" --address-prefixes "10.0.0.0/24" --resource-group $resourceGroup
+}
+
 Function New-TunnelVM {
     param(
         [string] $VmName,
@@ -80,11 +99,12 @@ Function New-TunnelVM {
         [string] $Size = "Standard_B2s",
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
         [string] $location = "westus",
-        [string] $resourceGroup = "$VmName-group"
+        [string] $resourceGroup = "$VmName-group",
+        [string] $VnetName = "$VmName-VNET"
     )
     
     Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --vnet-name $VnetName --only-show-errors | ConvertFrom-Json
 
     Write-Host "DNS is '$($vmdata.fqdns)'"
     return $vmdata
@@ -140,11 +160,12 @@ Function New-ServiceVM {
         [string] $Size = "Standard_B2s",
         [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
         [string] $location = "westus",
-        [string] $resourceGroup = "$VmName-group"
+        [string] $resourceGroup = "$VmName-group",
+        [string] $VnetName = "$VmName-VNET"
     )
     
     Write-Header "Creating VM '$VmName-server'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name "$VmName-server" --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-server" --admin-username $Username --only-show-errors | ConvertFrom-Json
+    $vmdata = az vm create --location $location --resource-group $resourceGroup --name "$VmName-server" --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-server" --admin-username $Username --vnet-name $VnetName --only-show-errors | ConvertFrom-Json
 
     Write-Host "DNS is '$($vmdata.fqdns)'"
     return $vmdata
