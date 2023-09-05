@@ -179,7 +179,10 @@ param(
     [Parameter(Mandatory=$false, ParameterSetName="Create")]
     [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
     [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [switch]$UseAllowList
+    [switch]$UseAllowList,
+
+    [Parameter(Mandatory=$false, ParameterSetName="CreateContext")]
+    [string]$ConfigFile
 )
 
 $script:SSHKeyPath = ""
@@ -555,12 +558,17 @@ if ($Delete) {
 } elseif ($SprintSignoff) {
     New-SprintSignoffEnvironment
 } else {
-    if ($ProfilesOnly) {
-        New-ProfilesOnlyEnvironment
-    } elseif ($WithADFS) {
-        New-ADFSEnvironment
+    if ($ConfigFile) {
+        # parse config file and set variables
+        # run scripts with context object
     } else {
-        New-TunnelEnvironment
+        if ($ProfilesOnly) {
+            New-ProfilesOnlyEnvironment
+        } elseif ($WithADFS) {
+            New-ADFSEnvironment
+        } else {
+            New-TunnelEnvironment
+        }
     }
 }
 #endregion Main Functions
