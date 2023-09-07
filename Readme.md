@@ -55,7 +55,6 @@ Switches:
 - `-NoPki` - Use the publicly trusted certificate instead of an enterprise certificate for Tunnel.
 - `-WithSSHOpen` - Open the SSH port on the VM.
 - `-StayLoggedIn` - Stay logged in to the accounts after the script finishes.
-- `-NoPki` - Use the publicly trusted certificate instead of an enterprise certificate for Tunnel.
 - `-UseInspection` - Configures proxy to use TLS inspection (Break and Inspect).
 - `-UseAllowList` - Configures proxy to use an allow list.
 - `-SprintSignoff` - Setups the services on a VM, and sets up a linux VM ready for tunnel installation, but doesn't create profiles or install Tunnel.

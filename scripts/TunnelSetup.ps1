@@ -10,7 +10,13 @@ Function Initialize-TunnelServer {
 
     $Content = Get-Content ./scripts/setup.exp
     $Content = $Content -replace "##SITE_ID##", "$($Context.TunnelSite.Id)"
-    $Content = $Content -replace "##ARGS##", "-c ./serverchain.pem -k ./server.key"
+
+    if ($Context.NoPki) {
+        $Content = $Content -replace "##ARGS##", "-c ./letsencrypt.pem -k ./letsencrypt.key"
+    } else {
+        $Content = $Content -replace "##ARGS##", "-c ./serverchain.pem -k ./server.key"
+    }
+    
     Set-Content -Path ./scripts/setup.exp.tmp -Value $Content -Force
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup.exp.tmp "$($Context.Username)@$($Context.TunnelFQDN):~/setup.exp" > $null
 
@@ -66,11 +72,12 @@ Function New-TunnelAgent {
     )
 
     if (-Not $TenantCredential) {
-        $TenantCredential = Get-Credential -Message "Please enter your Intune Tenant credentials"
-        $Script:TenantCredential = $TenantCredential
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id)"
+    } else {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id) '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
     }
 
-    $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id) '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
+    
 
     return $JWT
 }

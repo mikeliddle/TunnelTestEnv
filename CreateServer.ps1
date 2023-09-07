@@ -240,6 +240,18 @@ Function Initialize {
         $script:Context.Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
     }
     
+    if ($NoPki) {
+        $script:Context.NoPki = $true
+    } else {
+        $script:Context.NoPki = $false
+    }
+
+    if ($NoProxy) {
+        $script:Context.NoProxy = $true
+    } else {
+        $script:Context.NoProxy = $false
+    }
+
     if ($Simple) {
         $script:Context.NoProxy = $true
         $script:Context.NoPki = $true
@@ -263,7 +275,6 @@ Function Initialize-Variables {
     $script:Context.ListenPort = $ListenPort
     $script:Context.NoProxy = $NoProxy
     $script:Context.NoPACUrl = $NoPACUrl
-    $script:Context.NoPki = $NoPki
     $script:Context.UseInspection = $UseInspection
     $script:Context.UseAllowList = $UseAllowList
 
@@ -492,7 +503,6 @@ Function New-Summary {
     Write-Success "  http://$Context.ProxyIP - most stable for reachability check"
     Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $ProxyIP"
     Write-Success "  https://excluded or https://excluded.$($Context.TunnelFQDN) - When using a proxy, this should show you a different IP than above"
-    Write-Success "  https://trusted or https://trusted.$($Context.TunnelFQDN)"
     Write-Success "  https://$($Context.TunnelFQDN) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
     Write-Success "  https://untrusted or https://untrusted.$($Context.TunnelFQDN) - This endpoint should give you a certificate error"
 
