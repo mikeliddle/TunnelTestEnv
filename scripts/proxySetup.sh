@@ -38,7 +38,7 @@ InstallPrereqs() {
             $command >> install.log 2>&1
             
             if [ $? -ne 0 ]; then
-                LogError "Failed to install prerequisites."
+                LogWarning "Failed to install prerequisites, retrying..."
                 installSucceeded=1
                 retryCount=$((retryCount+1))
                 sleep 5

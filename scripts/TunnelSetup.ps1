@@ -1,45 +1,36 @@
 #region Setup Script
 Function Initialize-TunnelServer {
-    param(
-        [String] $FQDN,
-        [String] $SiteId,
-        [string] $SSHKeyPath,
-        [string] $Username = "azureuser"
-    )
-
     Write-Header "Generating setup script..."
 
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/createTunnel.sh "$($Username)@$($FQDN):~/" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup-expect.sh "$($Username)@$($FQDN):~/" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/serverchain.pem.tmp "$($Username)@$($FQDN):~/serverchain.pem" > $null
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/server.key.tmp "$($Username)@$($FQDN):~/server.key" > $null
+    scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/createTunnel.sh "$($Context.Username)@$($Context.TunnelFQDN):~/" > $null
+    scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup-expect.sh "$($Context.Username)@$($Context.TunnelFQDN):~/" > $null
+    scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/serverchain.pem.tmp "$($Context.Username)@$($Context.TunnelFQDN):~/serverchain.pem" > $null
+    scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/server.key.tmp "$($Context.Username)@$($Context.TunnelFQDN):~/server.key" > $null
 
 
     $Content = Get-Content ./scripts/setup.exp
-    $Content = $Content -replace "##SITE_ID##", "$SiteId"
-    $Content = $Content -replace "##ARGS##", "-c ./serverchain.pem -k ./server.key"
-    Set-Content -Path ./scripts/setup.exp.tmp -Value $Content -Force
-    scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup.exp.tmp "$($Username)@$($FQDN):~/setup.exp" > $null
+    $Content = $Content -replace "##SITE_ID##", "$($Context.TunnelSite.Id)"
 
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/createTunnel.sh"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/setup-expect.sh"
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/setup.exp"
+    if ($Context.NoPki) {
+        $Content = $Content -replace "##ARGS##", "-c ./letsencrypt.pem -k ./letsencrypt.key"
+    }
+    else {
+        $Content = $Content -replace "##ARGS##", "-c ./serverchain.pem -k ./server.key"
+    }
+    
+    Set-Content -Path ./scripts/setup.exp.tmp -Value $Content -Force
+    scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/setup.exp.tmp "$($Context.Username)@$($Context.TunnelFQDN):~/setup.exp" > $null
+
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.TunnelFQDN)" "chmod +x ~/createTunnel.sh"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.TunnelFQDN)" "chmod +x ~/setup-expect.sh"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.TunnelFQDN)" "chmod +x ~/setup.exp"
 }
 
 Function Initialize-SetupScript {
-    param(
-        [String] $FQDN,
-        [String] $Environment,
-        [Switch] $NoProxy,
-        [String] $Email,
-        [Microsoft.Graph.PowerShell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
-        [string] $Username = "azureuser"
-    )
-
-    try{
+    try {
         Write-Header "Generating setup script..."
         $Content = @"
-        export intune_env=$Environment;
+        export intune_env=$($Context.Environment);
 
         ./setup-expect.sh
         
@@ -59,12 +50,12 @@ Function Initialize-SetupScript {
         [IO.File]::WriteAllText($file, $text)
 
         Write-Header "Copying setup script to remote server..."
-        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./Setup.sh "$($Username)@$($FQDN):~/" > $null
-        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./agent.p12 "$($Username)@$($FQDN):~/" > $null
-        scp -i $SSHKeyPath -o "StrictHostKeyChecking=no" ./agent-info.json "$($Username)@$($FQDN):~/" > $null
+        scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./Setup.sh "$($Context.Username)@$($Context.TunnelFQDN):~/" > $null
+        scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./agent.p12 "$($Context.Username)@$($Context.TunnelFQDN):~/" > $null
+        scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./agent-info.json "$($Context.Username)@$($Context.TunnelFQDN):~/" > $null
 
         Write-Header "Marking setup scripts as executable..."
-        ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "chmod +x ~/Setup.sh"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.TunnelFQDN)" "chmod +x ~/Setup.sh"
     }
     finally {
         Remove-Item "./Setup.sh"
@@ -72,28 +63,23 @@ Function Initialize-SetupScript {
 }
 
 Function Invoke-SetupScript {
-    param(
-        [string] $SSHKeyPath,
-        [string] $Username,
-        [string] $FQDN
-    )
     Write-Header "Connecting into remote server..."
-    ssh -i $SSHKeyPath -o "StrictHostKeyChecking=no" "$($Username)@$($FQDN)" "sudo su -c './Setup.sh'"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.TunnelFQDN)" "sudo su -c './Setup.sh'"
 }
 
 Function New-TunnelAgent {
     param(
-        [string] $RunningOS,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelSite] $Site,
         [pscredential] $TenantCredential
     )
 
     if (-Not $TenantCredential) {
-        $TenantCredential = Get-Credential -Message "Please enter your Intune Tenant credentials"
-        $Script:TenantCredential = $TenantCredential
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id)"
+    }
+    else {
+        $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id) '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
     }
 
-    $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$RunningOS.exe Agent $($Site.Id) '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
+    
 
     return $JWT
 }

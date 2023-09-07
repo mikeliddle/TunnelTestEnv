@@ -6,6 +6,7 @@
 agent.p12
 agent-info.json
 Generated.xcconfig
+*.json
 
 # dotnet
 bin
