@@ -1,3 +1,46 @@
+Class TunnelContext {
+    [string] $VmName
+    [string] $ProxyVmName
+    [string] $ResourceGroup
+    [string] $Location = "westus"
+    [string] $Platform = "all"
+    [string[]] $BundleIds=@()
+    [string] $GroupName
+    [string] $Environment = "PE"
+    [string] $Email
+    [string] $Username = "azureuser"
+    [string] $Size = "Standard_B2s"
+    [string] $ProxySize = "Standard_B2s"
+    [string] $Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+    [string] $ProxyImage = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+    [bool] $NoProxy = $false
+    [bool] $WithSSHOpen = $false
+    [bool] $NoPACUrl = $false
+    [bool] $NoPki = $false
+    [bool] $UseInspection = $false
+    [bool] $UseAllowList = $false
+    [string] $PACUrl
+    [string] $RunningOS = "win"
+    [string] $SubscriptionId
+    [Object] $Subscription
+    [Object] $Account
+    [string] $SSHKeyPath = "$HOME/.ssh/$VmName"
+    [Object] $GraphContext
+    [Object] $Group
+    [string] $ServiceFQDN
+    [string] $TunnelFQDN
+    [string] $VnetName
+    [string] $SubnetName
+    [string] $ProxyIP
+    [pscredential[]] $AuthenticatedProxyCredentials = @()
+    [Object] $ServerConfiguration
+    [Object] $TunnelSite
+    [Int32] $ListenPort = 443
+    [string] $Subnet = "169.254.0.0/16"
+    [string[]] $IncludeRoutes = @()
+    [string[]] $ExcludeRoutes = @()
+}
+
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
 }
@@ -10,49 +53,37 @@ Function Write-Warning([string]$Message) {
     Write-Host $Message -ForegroundColor Yellow
 }
 Function New-SSHKeys {
-    param(
-        [string] $SSHKeyPath
-    )
     Write-Header "Generating new RSA 4096 SSH Key"
     
-    ssh-keygen -t rsa -b 4096 -f $SSHKeyPath -q -N ""
+    ssh-keygen -t rsa -b 4096 -f $Context.SSHKeyPath -q -N ""
 }
 
 Function Move-SSHKeys {
-    param(
-        [string] $SSHKeyPath
-    )
     Write-Header "Moving generated SSH keys..."
-    Move-Item -Path ~/.ssh/id_rsa -Destination $SSHKeyPath -Force
-    Move-Item -Path ~/.ssh/id_rsa.pub -Destination $SSHKeyPath.pub -Force    
+    Move-Item -Path ~/.ssh/id_rsa -Destination $Context.SSHKeyPath -Force
+    Move-Item -Path ~/.ssh/id_rsa.pub -Destination "$($Context.SSHKeyPath).pub" -Force    
 }
 
 Function Remove-SSHKeys {
-    param(
-        [string] $SSHKeyPath,
-        [string] $TunnelFQDN,
-        [string] $ServiceFQDN
-    )
-
     Write-Header "Deleting SSH keys..."
 
-    if (Test-Path $SSHKeyPath) {
-        Remove-Item -Path $SSHKeyPath -Force
+    if (Test-Path $Context.SSHKeyPath) {
+        Remove-Item -Path $($Context.SSHKeyPath) -Force
     }
     else {
-        Write-Host "Key at path '$SSHKeyPath' does not exist."
+        Write-Host "Key at path '$($Context.SSHKeyPath)' does not exist."
     }
 
-    if (Test-Path "$SSHKeyPath.pub") {
-        Remove-Item -Path "$SSHKeyPath.pub" -Force 
+    if (Test-Path "$($Context.SSHKeyPath).pub") {
+        Remove-Item -Path "$($Context.SSHKeyPath).pub" -Force 
     }
     else {
-        Write-Host "Key at path '$SSHKeyPath.pub' does not exist."
+        Write-Host "Key at path '$($Context.SSHKeyPath).pub' does not exist."
     }
 
     Write-Header "Deleting SSH keys from known hosts..."
-    ssh-keygen -R $TunnelFQDN
-    ssh-keygen -R $ServiceFQDN
+    ssh-keygen -R $Context.TunnelFQDN
+    ssh-keygen -R $Context.ServiceFQDN
 }
 
 Function Remove-TempFiles {

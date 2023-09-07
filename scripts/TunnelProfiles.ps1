@@ -33,87 +33,57 @@ Function Login-Graph {
 
 #region Tunnel Server Profiles
 Function New-TunnelConfiguration {
-    param(
-        [string] $ServerConfigurationName,
-        [Int32] $ListenPort = 443,
-        [string[]] $DnsServers = @("8.8.8.8"),
-        [string] $Subnet = "169.254.0.0/16",
-        [string[]] $IncludeRoutes = @(),
-        [string[]] $ExcludeRoutes = @(),
-        [string] $DefaultDomainSuffix = ""
-    )
-
     Write-Header "Creating Server Configuration..."
-    $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$ServerConfigurationName'" -Limit 1
-    if ($ServerConfiguration) {
-        Write-Host "Already found Server Configuration named '$ServerConfigurationName'"
+    $script:Context.ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$($Context.VmName)'" -Limit 1
+    if ($Context.ServerConfiguration) {
+        Write-Host "Already found Server Configuration named '$($Context.VmName)'"
     }
     else {
-        $ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $ServerConfigurationName -ListenPort $ListenPort -DnsServers $DnsServers -Network $Subnet -AdvancedSettings @() -DefaultDomainSuffix $DefaultDomainSuffix -RoleScopeTagIds @("0") -RouteExcludes $ExcludeRoutes -RouteIncludes $IncludeRoutes -SplitDns @()    
+        $script:Context.ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $Context.VmName -ListenPort $Context.ListenPort -DnsServers $Context.ProxyIP -Network $Context.Subnet -AdvancedSettings @() -DefaultDomainSuffix $Context.TunnelFQDN -RoleScopeTagIds @("0") -RouteExcludes $Context.ExcludeRoutes -RouteIncludes $Context.IncludeRoutes -SplitDns @()
     }
-
-    return $ServerConfiguration
 }
 
 Function Remove-TunnelConfiguration {
-    param(
-        [string] $ServerConfigurationName
-    )
-
     Write-Header "Deleting Server Configuration..."
-    $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$ServerConfigurationName'" -Limit 1
+    $ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($ServerConfiguration) {
         Remove-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
     }
     else {
-        Write-Host "Server Configuration '$ServerConfigurationName' does not exist."
+        Write-Host "Server Configuration '$($Context.VmName)' does not exist."
     }
 }
 
 Function New-TunnelSite {
-    param(
-        [string] $SiteName,
-        [string] $FQDN,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
-    )
-
     Write-Header "Creating Site..."
-    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
+    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Site) {
-        Write-Host "Already found Site named '$SiteName'"
+        Write-Host "Already found Site named '$($Context.VmName)'"
     }
     else {
-        $Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $SiteName -PublicAddress $FQDN -MicrosoftTunnelConfiguration @{id = $ServerConfiguration.id } -RoleScopeTagIds @("0") -UpgradeAutomatically    
+        $Site = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $Context.VmName -PublicAddress $Context.TunnelFQDN -MicrosoftTunnelConfiguration @{id = $Context.ServerConfiguration.id } -RoleScopeTagIds @("0") -UpgradeAutomatically
     }
 
-    return $Site
+    $script:Context.TunnelSite = $Site
 }
 
 Function Remove-TunnelSite {
-    param(
-        [string] $SiteName
-    )
-
     Write-Header "Deleting Site..."
-    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
+    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Site) {
         Remove-MgDeviceManagementMicrosoftTunnelSite -MicrosoftTunnelSiteId $Site.Id
     }
     else {
-        Write-Host "Site '$SiteName' does not exist."
+        Write-Host "Site '$($Context.VmName)' does not exist."
     }
 }
 
 Function Remove-TunnelServers {
-    param(
-        [string] $SiteName
-    )
-
     Write-Header "Deleting Servers..."
-    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$SiteName'" -Limit 1
+    $Site = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Site) {
         $servers = Get-MgDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Site.Id
@@ -124,32 +94,20 @@ Function Remove-TunnelServers {
         }
     }
     else {
-        Write-Host "No site found for '$SiteName', so no servers will be deleted."
+        Write-Host "No site found for '$($Context.VmName)', so no servers will be deleted."
     }
 }
 
 Function Update-PrivateDNSAddress {
-    param(
-        [string] $FQDN,
-        [string] $VmUsername,
-        [string] $SSHKeyPath,
-        [string] $DNSPrivateAddress,
-        [Microsoft.Graph.Powershell.Models.IMicrosoftGraphMicrosoftTunnelConfiguration] $ServerConfiguration
-    )
-
     Write-Header "Updating server configuration private DNS..."
 
-    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $DNSPrivateAddress -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
-    return Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $ServerConfiguration.Id
+    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $Context.ProxyIP -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
+    $script:Context.ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
 }
 #endregion Tunnel Server Profiles
 
 #region App Registration Setup
 Function New-ServicePrincipal {
-    param(
-        [String]$AADEnvironment
-    )
-
     $TunnelServicePrincipal = Get-MgServicePrincipal -Filter "DisplayName eq 'Microsoft Tunnel Gateway'"
     if ($TunnelServicePrincipal) {
         return

@@ -182,29 +182,7 @@ param(
     [switch]$UseAllowList
 )
 
-$script:SSHKeyPath = ""
-
 #region Helper Functions
-Function Initialize {
-    if ($IsLinux) {
-        $script:RunningOS = "linux"
-    } elseif ($IsMacOS) {
-        $script:RunningOS = "osx"
-    } else {
-        $script:RunningOS = "win"
-    }
-
-    if ($RHEL8) {
-        $script:Image = "RedHat:RHEL:8-LVM:latest"
-    } elseif ($RHEL7) {
-        $script:Image = "RedHat:RHEL:7-LVM:latest"
-    } elseif ($Centos7) {
-        $script:Image = "OpenLogic:CentOS:7_9:latest"
-    } elseif ($Simple) {
-        $script:NoProxy = $true
-        $script:NoPki = $true
-    }
-}
 
 Function Test-Prerequisites {
     Write-Header "Checking prerequisites..."
@@ -241,33 +219,85 @@ Function Logout {
 }
 
 Function Initialize-Variables {
-    $script:VmName = $VmName.ToLower()
-    $script:Account = (az account show | ConvertFrom-Json)
-    $script:Subscription = $Account.id
-    if ($Email -eq "") {
-        Write-Header "Email not provided. Detecting email..."
-        $script:Email = $Account.user.name
-        Write-Host "Detected your email as '$Email'"
+    $script:Context = [TunnelContext]::new()
+
+    if ($IsLinux) {
+        $script:Context.RunningOS = "linux"
+    } elseif ($IsMacOS) {
+        $script:Context.RunningOS = "osx"
+    } else {
+        $script:Context.RunningOS = "win"
     }
 
-    $script:ResourceGroup = "$VmName-group"
-    $script:SSHKeyPath = "$HOME/.ssh/$VmName"
+    if ($RHEL8) {
+        $script:Context.Image = "RedHat:RHEL:8-LVM:latest"
+    } elseif ($RHEL7) {
+        $script:Context.Image = "RedHat:RHEL:7-LVM:latest"
+    } elseif ($Centos7) {
+        $script:Context.Image = "OpenLogic:CentOS:7_9:latest"
+    } else {
+        $script:Context.Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+    }
+    
+    if ($Simple) {
+        $script:Context.NoProxy = $true
+        $script:Context.NoPki = $true
+    }
 
-    $script:GraphContext = Get-MgContext
+    $script:Context.VmName = $VmName.ToLower()
+    $script:Context.ProxyVmName = $Context.VmName + "-server"
+    $script:Context.Location = $Location
+    $script:Context.Environment = $Environment
+    $script:Context.Username = $Username
+    $script:Context.Size = $Size
+    $script:Context.ProxySize = $ProxySize
+    $script:Context.Platform = $Platform
+    $script:Context.BundleIds = $BundleIds
+    $script:Context.Username = $Username
+    $script:Context.AuthenticatedProxyCredentials = $AuthenticatedProxyCredentials
+    $script:Context.IncludeRoutes = $IncludeRoutes
+    $script:Context.ExcludeRoutes = $ExcludeRoutes
+    $script:Context.ListenPort = $ListenPort
+    $script:Context.NoProxy = $NoProxy
+    $script:Context.NoPACUrl = $NoPACUrl
+    $script:Context.NoPki = $NoPki
+    $script:Context.UseInspection = $UseInspection
+    $script:Context.UseAllowList = $UseAllowList
+    $script:Context.PACUrl = $PACUrl
 
-    $script:FQDN = "$VmName.$Location.cloudapp.azure.com"
+
+    $script:Context.Account = (az account show | ConvertFrom-Json)
+    $script:Context.Subscription = $Account.id
+    if ($Email -eq "") {
+        Write-Header "Email not provided. Detecting email..."
+        $script:Context.Email = $Account.user.name
+        Write-Host "Detected your email as '$Email'"
+    } else {
+        $script:Context.Email = $Email
+    }
+
+    $script:Context.ResourceGroup = "$VmName-group"
+    $script:Context.SSHKeyPath = "$HOME/.ssh/$VmName"
+
+    $script:Context.GraphContext = Get-MgContext
+
+    $script:Context.TunnelFQDN = "$VmName.$Location.cloudapp.azure.com"
+    $script:Context.ServiceFQDN = "$VmName-server.$Location.cloudapp.azure.com"
 
     if ($PACUrl -eq "") {
-        $script:PACUrl = "http://$FQDN/tunnel.pac"
+        $script:Context.PACUrl = "http://$($Context.TunnelFQDN)/tunnel.pac"
+    } else {
+        $script:Context.PACUrl = $PACUrl
     }
 
     if (-Not $Delete -And -Not $SprintSignoff) {
         # We only need a group name for the create and profile flows
-        $script:Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
+        $script:Context.Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
         if (-Not $Group) {
             Write-Error "Could not find group named '$GroupName'"
             Exit -1
         }
+        $script:Context.GroupName = $GroupName
     }
 }
 
@@ -305,55 +335,53 @@ Function New-Profiles {
 Function New-TunnelEnvironment {
     Login
     Initialize-Variables
-    New-SSHKeys $SSHKeyPath
+    New-SSHKeys
 
-    New-ServicePrincipal -AADEnvironment Environment
+    New-ServicePrincipal
 
-    $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
-    $TunnelVnet = New-Network -VmName $VmName -ResourceGroup $ResourceGroup.name
-    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
-    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
-
-    $ServiceVMName = "$VmName-server"
-    $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+    New-ResourceGroup
+    New-Network
+    New-TunnelVM
+    New-ServiceVM
+    
+    $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
 
     if (-Not $Simple) {
-        New-AdvancedNetworkRules -resourceGroup $ResourceGroup.name -ProxyIP $ProxyIP -VmName $VmName -WithSSHOpen $WithSSHOpen
+        New-AdvancedNetworkRules
     } else {
-        New-NetworkRules -resourceGroup $ResourceGroup.name -VmName $VmName -WithSSHOpen $WithSSHOpen
+        New-NetworkRules
     }
 
-    if (!$NoProxy) {
+    if (!$Context.NoProxy) {
         # Setup Proxy server on Service VM
-        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
-        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
+        Initialize-Proxy
+        Invoke-ProxyScript
     }
 
     # Create Certificates
-    New-BasicPki -ServiceVMDNS $ServiceVM.fqdns -TunnelVMDNS $TunnelVm.fqdns -Username $Username -SSHKeyPath $SSHKeyPath
-
+    New-BasicPki
     # Setup DNS
-    New-DnsServer -TunnelVMDNS $TunnelVM.fqdns -ProxyIP $ProxyIP -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns
+    New-DnsServer
     # Setup WebServers
-    New-NginxSetup -TunnelVMDNS $TunnelVM.fqdns -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns -Email $Email -ServerIp $ProxyIP
+    New-NginxSetup
 
-    Update-RebootVM -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+    Update-RebootVM
 
     # Create Tunnel Configuration
-    $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns
-    $TunnelSite = New-TunnelSite -SiteName $VmName -FQDN $TunnelVM.fqdns -ServerConfiguration $ServerConfiguration
+    New-TunnelConfiguration
+    New-TunnelSite
 
     # Enroll Tunnel Agent
-    New-TunnelAgent -RunningOS $RunningOS -Site $TunnelSite -TenantCredential $TenantCredential
+    New-TunnelAgent -TenantCredential $TenantCredential
 
-    Initialize-TunnelServer -FQDN $TunnelVm.fqdns -SiteId $TunnelSite.Id -SSHKeyPath $SSHKeyPath -Username $Username
-    Initialize-SetupScript -FQDN $TunnelVm.fqdns -Environment $Environment -NoProxy $NoProxy -NoPki $NoPki -Email $Email -Site $TunnelSite -Username $Username
-    Invoke-SetupScript -SSHKeyPath $SSHKeyPath -Username $Username -FQDN $TunnelVm.fqdns
+    Initialize-TunnelServer
+    Initialize-SetupScript
+    Invoke-SetupScript
 
-    Update-PrivateDNSAddress -FQDN $ServiceVM.fqdns -VmUsername $Username -SSHKeyPath $SSHKeyPath -ServerConfiguration $ServerConfiguration -DNSPrivateAddress $ProxyIP
+    Update-PrivateDNSAddress
 
-    $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
-    New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
+    $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $Context.GraphContext.TenantId -BundleIds $Context.BundleIds
+    New-GeneratedXCConfig -bundle $Context.BundleIds[0] -AppId $AppRegistration.AppId -TenantId $Context.GraphContext.TenantId
 
     New-Profiles
 
@@ -365,39 +393,37 @@ Function New-TunnelEnvironment {
 }
 
 Function New-SprintSignoffEnvironment {
-    Login-Azure -SubscriptionId $SubscriptionId -VmTenantCredential $VmTenantCredential
+    Login-Azure -VmTenantCredential $VmTenantCredential
     Initialize-Variables
-    New-SSHKeys $SSHKeyPath
+    New-SSHKeys
 
-    $ResourceGroup = New-ResourceGroup -resourceGroup "$VmName-group"
-    $TunnelVnet = New-Network -VmName $VmName -ResourceGroup $ResourceGroup.name
-    $TunnelVM = New-TunnelVM -VmName $VmName -Username $Username -Image $Image -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
-    $ServiceVM = New-ServiceVM -VmName $VmName -Username $Username -Size $Size -SSHKeyPath $SSHKeyPath -location $location -ResourceGroup $ResourceGroup.name -VnetName $TunnelVnet.name
+    New-ResourceGroup
+    New-Network
+    New-TunnelVM
+    New-ServiceVM
 
-    $ServiceVMName = "$VmName-server"
-    $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+    $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
 
     if (-Not $Simple) {
-        New-AdvancedNetworkRules -resourceGroup $ResourceGroup.name -ProxyIP $ProxyIP -VmName $VmName -WithSSHOpen $WithSSHOpen
+        New-AdvancedNetworkRules
     } else {
-        New-NetworkRules -resourceGroup $ResourceGroup.name -VmName $VmName -WithSSHOpen $WithSSHOpen
+        New-NetworkRules
     }
 
-    if (!$NoProxy) {
+    if (!$Context.NoProxy) {
         # Setup Proxy server on Service VM
-        Initialize-Proxy -VmName $ServiceVMName -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -TunnelServer $TunnelVM.fqdns -ResourceGroup $ResourceGroup.name -UseInspection $UseInspection -UseAllowList $UseAllowList -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
-        Invoke-ProxyScript -ProxyVMData $ServiceVM -Username $Username -SSHKeyPath $SSHKeyPath -UseInspection $UseInspection -AuthenticatedProxyCredentials $AuthenticatedProxyCredentials
+        Initialize-Proxy
+        Invoke-ProxyScript
     }
 
     # Create Certificates
-    New-BasicPki -ServiceVMDNS $ServiceVM.fqdns -TunnelVMDNS $TunnelVm.fqdns -Username $Username -SSHKeyPath $SSHKeyPath
-
+    New-BasicPki
     # Setup DNS
-    New-DnsServer -TunnelVMDNS $TunnelVM.fqdns -ProxyIP $ProxyIP -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns
+    New-DnsServer
     # Setup WebServers
-    New-NginxSetup -TunnelVMDNS $TunnelVM.fqdns -Username $Username -SSHKeyPath $SSHKeyPath -ServiceVMDNS $ServiceVM.fqdns -Email $Email -ServerIp $ProxyIP
+    New-NginxSetup
 
-    Update-RebootVM -VmName $ServiceVMName -ResourceGroup $ResourceGroup.name
+    Update-RebootVM
 
     New-Summary
 
@@ -544,7 +570,6 @@ Function Remove-ProfilesOnlyEnvironment {
 . ./scripts/SetupServices.ps1
 
 Test-Prerequisites
-Initialize
 
 if ($Delete) {
     if ($ProfilesOnly) {
