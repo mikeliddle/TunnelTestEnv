@@ -28,12 +28,12 @@ Function Login-Azure {
             }
         }
 
-        Write-Header "Setting subscription to $Context.SubscriptionId"
+        Write-Header "Setting subscription to $($Context.SubscriptionId)"
         az account set --subscription $Context.SubscriptionId | Out-Null
     } elseif ($accounts[0].id -ne $Context.SubscriptionId) {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
         Write-Warning "If you don't want to use this account, please logout, then run this script again."
-        Write-Header "Setting subscription to $Context.SubscriptionId"
+        Write-Header "Setting subscription to $($Context.SubscriptionId)"
         az account set --subscription $Context.SubscriptionId | Out-Null
     } else {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
@@ -49,7 +49,7 @@ Function New-ResourceGroup {
     }
     
     Write-Header "Creating resource group '$($Context.ResourceGroup)'..."
-    return az group create --location $Context.Location --name $Context.ResourceGroup --only-show-errors | ConvertFrom-Json
+    az group create --location $Context.Location --name $Context.ResourceGroup --only-show-errors | Out-Null
 }
 
 Function Remove-ResourceGroup {
@@ -66,6 +66,7 @@ Function Remove-ResourceGroup {
 Function New-Network {
     $NsgName="$($Context.VmName)-VNET-NSG"
     $script:Context.VnetName="$($Context.VmName)-VNET"
+    $script:Context.SubnetName="$($Context.VmName)-Subnet"
 
     Write-Header "Creating network $($Context.VnetName)..."
 
@@ -73,16 +74,13 @@ Function New-Network {
     az network nsg rule create --nsg-name $NsgName --name "AllowSSHIN" --priority 1000 --resource-group $Context.ResourceGroup --access Allow --destination-port-ranges 22 --protocol Tcp --direction Inbound --only-show-errors | Out-Null
     az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" --only-show-errors | Out-Null
 
-    az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup | ConvertFrom-Json
-    az network vnet subnet create --network-security-group $NsgName --vnet-name $Context.VnetName --name "$($Context.VnetName)-subnet" --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+    az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+    az network vnet subnet create --network-security-group $NsgName --vnet-name $Context.VnetName --name "$($Context.SubnetName)" --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
 }
 
 Function New-TunnelVM {    
     Write-Header "Creating VM '$($Context.VmName)'..."
-    $vmdata = az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --only-show-errors | ConvertFrom-Json
-
-    Write-Host "DNS is '$($vmdata.fqdns)'"
-    return $vmdata
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
 }
 
 Function New-NetworkRules {
@@ -117,10 +115,7 @@ Function New-AdvancedNetworkRules {
 
 Function New-ServiceVM {    
     Write-Header "Creating VM '$($Context.VmName)-server'..."
-    $vmdata = az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name "$($Context.VmName)-server" --admin-username $Context.Username --vnet-name $Context.VnetName --only-show-errors | ConvertFrom-Json
-
-    Write-Host "DNS is '$($vmdata.fqdns)'"
-    return $vmdata
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name "$($Context.VmName)-server" --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
 }
 
 Function Update-RebootVM {

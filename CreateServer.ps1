@@ -203,8 +203,9 @@ Function Test-Prerequisites {
 }
 
 Function Login {
+    $script:Context.SubscriptionId = $SubscriptionId
     if (-Not $ProfilesOnly) {
-        Login-Azure -SubscriptionId $SubscriptionId -VmTenantCredential $VmTenantCredential
+        Login-Azure -VmTenantCredential $VmTenantCredential
     }
     
     Login-Graph -TenantCredential $TenantCredential
@@ -218,7 +219,7 @@ Function Logout {
     }
 }
 
-Function Initialize-Variables {
+Function Initialize {
     $script:Context = [TunnelContext]::new()
 
     if ($IsLinux) {
@@ -243,7 +244,9 @@ Function Initialize-Variables {
         $script:Context.NoProxy = $true
         $script:Context.NoPki = $true
     }
+}
 
+Function Initialize-Variables {
     $script:Context.VmName = $VmName.ToLower()
     $script:Context.ProxyVmName = $Context.VmName + "-server"
     $script:Context.Location = $Location
@@ -263,15 +266,13 @@ Function Initialize-Variables {
     $script:Context.NoPki = $NoPki
     $script:Context.UseInspection = $UseInspection
     $script:Context.UseAllowList = $UseAllowList
-    $script:Context.PACUrl = $PACUrl
-
 
     $script:Context.Account = (az account show | ConvertFrom-Json)
-    $script:Context.Subscription = $Account.id
+    $script:Context.Subscription = $Context.Account.id
     if ($Email -eq "") {
         Write-Header "Email not provided. Detecting email..."
-        $script:Context.Email = $Account.user.name
-        Write-Host "Detected your email as '$Email'"
+        $script:Context.Email = $Context.Account.user.name
+        Write-Host "Detected your email as '$($Context.Email)'"
     } else {
         $script:Context.Email = $Email
     }
@@ -293,7 +294,7 @@ Function Initialize-Variables {
     if (-Not $Delete -And -Not $SprintSignoff) {
         # We only need a group name for the create and profile flows
         $script:Context.Group = Get-MgGroup -Filter "displayName eq '$GroupName'"
-        if (-Not $Group) {
+        if (-Not $Context.Group) {
             Write-Error "Could not find group named '$GroupName'"
             Exit -1
         }
@@ -302,30 +303,30 @@ Function Initialize-Variables {
 }
 
 Function New-Profiles {
-    if ($NoProxy) {
+    if ($Context.NoProxy) {
         $ProxyHostname = ""
         $ProxyPort = ""
         $PACUrl = ""
     } else {
         # TODO: If $TunnelVm doesn't resolve (due to being profiles only), then fetch it from the az cli
-        $ProxyHostname = $TunnelVm.fqdns
+        $ProxyHostname = $Context.TunnelFQDN
         $ProxyPort = "3128"
-        $PACUrl = "http://$($TunnelVm.fqdns)/tunnel.pac"
+        $PACUrl = "http://$($Context.TunnelFQDN)/tunnel.pac"
     }
 
-    if ($NoPACUrl) {
-        if ($Platform -eq "ios" -or $Platform -eq "all") {
-            New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+    if ($Context.NoPACUrl) {
+        if ($Context.Platform -eq "ios" -or $Context.Platform -eq "all") {
+            New-IOSProfiles -GroupId $Context.Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
         }
-        if ($Platform -eq "android" -or $Platform -eq "all") {
-            New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        if ($Context.Platform -eq "android" -or $Context.Platform -eq "all") {
+            New-AndroidProfiles -GroupId $Context.Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
         }
     } else {
-        if ($Platform -eq "ios" -or $Platform -eq "all") {
-            New-IOSProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl $PACUrl -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        if ($Context.Platform -eq "ios" -or $Context.Platform -eq "all") {
+            New-IOSProfiles -GroupId $Context.Group.Id -PACUrl $PACUrl
         }
-        if ($Platform -eq "android" -or $Platform -eq "all") {
-            New-AndroidProfiles -VmName $VmName -certFileName cacert.pem.tmp -GroupId $Group.Id -PACUrl $PACUrl -Site $TunnelSite -ServerConfiguration $ServerConfiguration
+        if ($Context.Platform -eq "android" -or $Context.Platform -eq "all") {
+            New-AndroidProfiles -GroupId $Context.Group.Id -PACUrl $PACUrl
         }
     }
 }
@@ -435,48 +436,48 @@ Function New-SprintSignoffEnvironment {
 Function New-Summary {
     Write-Success "=====================Summary====================="
     
-    Write-Success "VM Username: $Username"
-    Write-Success "VM SSH Key: $SSHKeyPath"
+    Write-Success "VM Username: $($Context.Username)"
+    Write-Success "VM SSH Key: $($Context.SSHKeyPath)"
     Write-Success ""
-    Write-Success "Tunnel Server Address: $($TunnelVM.fqdns)"
+    Write-Success "Tunnel Server Address: $($Context.TunnelFQDN)"
     Write-Success ""
 
     if (!$SprintSignoff) {
-        Write-Success "Profiles targeted to $($Group.displayName)"
+        Write-Success "Profiles targeted to $($Context.GroupName)"
         Write-Success ""
     }
 
-    if ($BundleIds.Count -gt 0) {
-        Write-Success "Targeted App Bundle IDs for MAM: $($BundleIds -join ', ')"
+    if ($Context.BundleIds.Count -gt 0) {
+        Write-Success "Targeted App Bundle IDs for MAM: $($Context.BundleIds -join ', ')"
         Write-Success ""
     }
 
-    if ($IncludeRoutes.Count -gt 0) {
-        Write-Success "Routes to include: $($IncludeRoutes -join ', ')"
+    if ($Context.IncludeRoutes.Count -gt 0) {
+        Write-Success "Routes to include: $($Context.IncludeRoutes -join ', ')"
         Write-Success ""
     }
 
-    if ($ExcludeRoutes.Count -gt 0) {
-        Write-Success "Routes to exclude: $($ExcludeRoutes -join ', ')"
+    if ($Context.ExcludeRoutes.Count -gt 0) {
+        Write-Success "Routes to exclude: $($Context.ExcludeRoutes -join ', ')"
         Write-Success ""
     }
 
-    if (!$NoProxy) {
-        Write-Success "PAC URL: http://$($TunnelVM.fqdns)/tunnel.pac"
-        Write-Success "Proxy Hostname: proxy.$($TunnelVM.fqdns)"
+    if (!$Context.NoProxy) {
+        Write-Success "PAC URL: http://$($Context.TunnelFQDN)/tunnel.pac"
+        Write-Success "Proxy Hostname: proxy.$($Context.TunnelFQDN)"
         Write-Success "Proxy Port: 3128"
         Write-Success ""
         Write-Success "These URLS Bypass the proxy when using a PAC file: "
         Write-Success "  www.google.com"
-        Write-Success "  excluded.$($TunnelVM.fqdns)"
+        Write-Success "  excluded.$($Context.TunnelFQDN)"
         Write-Success ""
         
-        if ($UseInspection) {
+        if ($Context.UseInspection) {
             Write-Success "Proxy is configured for TLS Inspection"
             Write-Success ""
         }
 
-        if ($UseAllowList) {
+        if ($Context.UseAllowList) {
             Write-Success "Only the following URLs are allowed through the proxy:"
             $Allowlist = Get-Content -Path "proxy\allowlist.tmp"
             Write-Success $Allowlist
@@ -484,16 +485,16 @@ Function New-Summary {
         }
     }
 
-    Write-Success "DNS Server: $ProxyIP"
-    Write-Success "Default Search Suffix: $($TunnelVM.fqdns)"
+    Write-Success "DNS Server: $Context.ProxyIP"
+    Write-Success "Default Search Suffix: $($Context.TunnelFQDN)"
     Write-Success ""
     Write-Success "Internal Endpoints: "
-    Write-Success "  http://$ProxyIP - most stable for reachability check"
-    Write-Success "  https://webapp or https://webapp.$($TunnelVM.fqdns) - When using a proxy, this should show your IP as $ProxyIP"
-    Write-Success "  https://excluded or https://excluded.$($TunnelVM.fqdns) - When using a proxy, this should show you a different IP than above"
-    Write-Success "  https://trusted or https://trusted.$($TunnelVM.fqdns)"
-    Write-Success "  https://$($TunnelVM.fqdns) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
-    Write-Success "  https://untrusted or https://untrusted.$($TunnelVM.fqdns) - This endpoint should give you a certificate error"
+    Write-Success "  http://$Context.ProxyIP - most stable for reachability check"
+    Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $ProxyIP"
+    Write-Success "  https://excluded or https://excluded.$($Context.TunnelFQDN) - When using a proxy, this should show you a different IP than above"
+    Write-Success "  https://trusted or https://trusted.$($Context.TunnelFQDN)"
+    Write-Success "  https://$($Context.TunnelFQDN) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
+    Write-Success "  https://untrusted or https://untrusted.$($Context.TunnelFQDN) - This endpoint should give you a certificate error"
 
     if ($SprintSignoff) {
         Write-Success ""
@@ -570,6 +571,7 @@ Function Remove-ProfilesOnlyEnvironment {
 . ./scripts/SetupServices.ps1
 
 Test-Prerequisites
+Initialize
 
 if ($Delete) {
     if ($ProfilesOnly) {
