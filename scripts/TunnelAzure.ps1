@@ -23,19 +23,22 @@ Function Login-Azure {
                     Write-Host "$($account.name) - $($account.id)"
                 }
                 $script:Context.SubscriptionId = Read-Host "Please specify a subscription id: "
-            } else {
+            }
+            else {
                 $script:Context.SubscriptionId = $accounts[0].id
             }
         }
 
         Write-Header "Setting subscription to $($Context.SubscriptionId)"
         az account set --subscription $Context.SubscriptionId | Out-Null
-    } elseif ($accounts[0].id -ne $Context.SubscriptionId) {
+    }
+    elseif ($accounts[0].id -ne $Context.SubscriptionId) {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
         Write-Warning "If you don't want to use this account, please logout, then run this script again."
         Write-Header "Setting subscription to $($Context.SubscriptionId)"
         az account set --subscription $Context.SubscriptionId | Out-Null
-    } else {
+    }
+    else {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
         Write-Warning "Using subscription $($accounts[0].id)"
         Write-Warning "If you don't want to use this account, please logout, then run this script again."
@@ -64,9 +67,9 @@ Function Remove-ResourceGroup {
 }
 
 Function New-Network {
-    $NsgName="$($Context.VmName)-VNET-NSG"
-    $script:Context.VnetName="$($Context.VmName)-VNET"
-    $script:Context.SubnetName="$($Context.VmName)-Subnet"
+    $NsgName = "$($Context.VmName)-VNET-NSG"
+    $script:Context.VnetName = "$($Context.VmName)-VNET"
+    $script:Context.SubnetName = "$($Context.VmName)-Subnet"
 
     Write-Header "Creating network $($Context.VnetName)..."
 

@@ -23,7 +23,8 @@ Function Initialize-Proxy {
             }
             #htpasswd -bc $passwordsFile $ProxyCredential.Username $ProxyCredential.GetNetworkCredential().Password
             $basicAuthConfig = Get-Content $basicAuthFile -Raw
-        } else {
+        }
+        else {
             $basicAuthConfig = ""
         }
 
@@ -32,7 +33,8 @@ Function Initialize-Proxy {
             (Get-Content $ExcludeDomainFile) -replace "##DOMAIN_NAME##", "$Context.TunnelFQDN" | out-file (Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains.tmp")
             $breakAndInspectConfig = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "BreakAndInspect.conf"
             $breakAndInspectConfig = Get-Content $breakAndInspectConfig -Raw
-        } else {
+        }
+        else {
             $breakAndInspectConfig = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "vanilla.conf"
             $breakAndInspectConfig = Get-Content $breakAndInspectConfig -Raw
         }
@@ -40,7 +42,8 @@ Function Initialize-Proxy {
         if ($Context.UseAllowList) {
             $allowlistConfig = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "allowlist.conf"
             $allowlistConfig = Get-Content $allowlistConfig -Raw
-        } else {
+        }
+        else {
             $allowlistConfig = ""
         }
 

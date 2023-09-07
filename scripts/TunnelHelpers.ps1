@@ -4,7 +4,7 @@ Class TunnelContext {
     [string] $ResourceGroup
     [string] $Location = "westus"
     [string] $Platform = "all"
-    [string[]] $BundleIds=@()
+    [string[]] $BundleIds = @()
     [string] $GroupName
     [string] $Environment = "PE"
     [string] $Email

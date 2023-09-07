@@ -1,184 +1,184 @@
-[cmdletbinding(DefaultParameterSetName="Create")]
+[cmdletbinding(DefaultParameterSetName = "Create")]
 param(
-    [Parameter(Mandatory=$true, ParameterSetName="Create")]
-    [Parameter(Mandatory=$true, ParameterSetName="SprintSignoff")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
-    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $true, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $true, ParameterSetName = "SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $true, ParameterSetName = "Delete")]
+    [Parameter(Mandatory = $true, ParameterSetName = "ProfilesOnly")]
     [string]$VmName,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string[]]$BundleIds=@(),
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [string[]]$BundleIds = @(),
 
-    [Parameter(Mandatory=$true, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $true, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $true, ParameterSetName = "ProfilesOnly")]
     [string]$GroupName,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [ValidateSet("ios","android","all")]
-    [string]$Platform="all",
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [ValidateSet("ios", "android", "all")]
+    [string]$Platform = "all",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [ValidateSet("eastasia","southeastasia","centralus","eastus","eastus2","westus","westus3","northcentralus","southcentralus","northeurope","westeurope","japanwest","japaneast","brazilsouth","australiaeast","australiasoutheast","southindia","centralindia","westindia","canadacentral","canadaeast","uksouth","ukwest","westcentralus","westus2","koreacentral","koreasouth","francecentral","francesouth","australiacentral","australiacentral2")]
-    [string]$Location="westus",
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [ValidateSet("eastasia", "southeastasia", "centralus", "eastus", "eastus2", "westus", "westus3", "northcentralus", "southcentralus", "northeurope", "westeurope", "japanwest", "japaneast", "brazilsouth", "australiaeast", "australiasoutheast", "southindia", "centralindia", "westindia", "canadacentral", "canadaeast", "uksouth", "ukwest", "westcentralus", "westus2", "koreacentral", "koreasouth", "francecentral", "francesouth", "australiacentral", "australiacentral2")]
+    [string]$Location = "westus",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [ValidateSet("PE","SelfHost","OneDF")]
-    [string]$Environment="PE",
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [ValidateSet("PE", "SelfHost", "OneDF")]
+    [string]$Environment = "PE",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [string]$Email="",
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [string]$Email = "",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [string]$Username="azureuser",
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [string]$Username = "azureuser",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [string]$Size = "Standard_B2s",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [string]$ProxySize = "Standard_B2s",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
     
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$RHEL8,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$RHEL7,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$Centos7,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$Simple,    
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
     [string]$ADApplication = "Generated MAM Tunnel",
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [string]$SubscriptionId,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$NoProxy,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
     [switch]$NoPACUrl,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [pscredential[]]$AuthenticatedProxyCredentials=$null,
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [pscredential[]]$AuthenticatedProxyCredentials = $null,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
     [switch]$NoPki,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [pscredential]$VmTenantCredential,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
     [pscredential]$TenantCredential,
 
-    [Parameter(Mandatory=$true, ParameterSetName="Delete")]
+    [Parameter(Mandatory = $true, ParameterSetName = "Delete")]
     [switch]$Delete,
 
-    [Parameter(Mandatory=$true, ParameterSetName="ProfilesOnly")]
-    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
+    [Parameter(Mandatory = $true, ParameterSetName = "ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
     [switch]$ProfilesOnly,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="Delete")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$StayLoggedIn,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$WithSSHOpen,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
     [string]$PACUrl,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string[]]$IncludeRoutes=@(),
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [string[]]$IncludeRoutes = @(),
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [string[]]$ExcludeRoutes=@(),
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [string[]]$ExcludeRoutes = @(),
 
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
     [switch]$WithADFS,
 
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$SprintSignoff,
 
-    [Parameter(Mandatory=$true, ParameterSetName="ADFS")]
+    [Parameter(Mandatory = $true, ParameterSetName = "ADFS")]
     [string]$DomainName,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="ProfilesOnly")]
-    [Int32]$ListenPort=443,
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
+    [Int32]$ListenPort = 443,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$UseInspection,
 
-    [Parameter(Mandatory=$false, ParameterSetName="Create")]
-    [Parameter(Mandatory=$false, ParameterSetName="ADFS")]
-    [Parameter(Mandatory=$false, ParameterSetName="SprintSignoff")]
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$UseAllowList
 )
 
@@ -224,31 +224,38 @@ Function Initialize {
 
     if ($IsLinux) {
         $script:Context.RunningOS = "linux"
-    } elseif ($IsMacOS) {
+    }
+    elseif ($IsMacOS) {
         $script:Context.RunningOS = "osx"
-    } else {
+    }
+    else {
         $script:Context.RunningOS = "win"
     }
 
     if ($RHEL8) {
         $script:Context.Image = "RedHat:RHEL:8-LVM:latest"
-    } elseif ($RHEL7) {
+    }
+    elseif ($RHEL7) {
         $script:Context.Image = "RedHat:RHEL:7-LVM:latest"
-    } elseif ($Centos7) {
+    }
+    elseif ($Centos7) {
         $script:Context.Image = "OpenLogic:CentOS:7_9:latest"
-    } else {
+    }
+    else {
         $script:Context.Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
     }
     
     if ($NoPki) {
         $script:Context.NoPki = $true
-    } else {
+    }
+    else {
         $script:Context.NoPki = $false
     }
 
     if ($NoProxy) {
         $script:Context.NoProxy = $true
-    } else {
+    }
+    else {
         $script:Context.NoProxy = $false
     }
 
@@ -284,7 +291,8 @@ Function Initialize-Variables {
         Write-Header "Email not provided. Detecting email..."
         $script:Context.Email = $Context.Account.user.name
         Write-Host "Detected your email as '$($Context.Email)'"
-    } else {
+    }
+    else {
         $script:Context.Email = $Email
     }
 
@@ -298,7 +306,8 @@ Function Initialize-Variables {
 
     if ($PACUrl -eq "") {
         $script:Context.PACUrl = "http://$($Context.TunnelFQDN)/tunnel.pac"
-    } else {
+    }
+    else {
         $script:Context.PACUrl = $PACUrl
     }
 
@@ -318,7 +327,8 @@ Function New-Profiles {
         $ProxyHostname = ""
         $ProxyPort = ""
         $PACUrl = ""
-    } else {
+    }
+    else {
         # TODO: If $TunnelVm doesn't resolve (due to being profiles only), then fetch it from the az cli
         $ProxyHostname = $Context.TunnelFQDN
         $ProxyPort = "3128"
@@ -332,7 +342,8 @@ Function New-Profiles {
         if ($Context.Platform -eq "android" -or $Context.Platform -eq "all") {
             New-AndroidProfiles -GroupId $Context.Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
         }
-    } else {
+    }
+    else {
         if ($Context.Platform -eq "ios" -or $Context.Platform -eq "all") {
             New-IOSProfiles -GroupId $Context.Group.Id -PACUrl $PACUrl
         }
@@ -360,7 +371,8 @@ Function New-TunnelEnvironment {
 
     if (-Not $Simple) {
         New-AdvancedNetworkRules
-    } else {
+    }
+    else {
         New-NetworkRules
     }
 
@@ -418,7 +430,8 @@ Function New-SprintSignoffEnvironment {
 
     if (-Not $Simple) {
         New-AdvancedNetworkRules
-    } else {
+    }
+    else {
         New-NetworkRules
     }
 
@@ -586,17 +599,22 @@ Initialize
 if ($Delete) {
     if ($ProfilesOnly) {
         Remove-ProfilesOnlyEnvironment
-    } else {
+    }
+    else {
         Remove-TunnelEnvironment
     }
-} elseif ($SprintSignoff) {
+}
+elseif ($SprintSignoff) {
     New-SprintSignoffEnvironment
-} else {
+}
+else {
     if ($ProfilesOnly) {
         New-ProfilesOnlyEnvironment
-    } elseif ($WithADFS) {
+    }
+    elseif ($WithADFS) {
         New-ADFSEnvironment
-    } else {
+    }
+    else {
         New-TunnelEnvironment
     }
 }

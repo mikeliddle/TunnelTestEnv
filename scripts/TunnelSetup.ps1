@@ -13,7 +13,8 @@ Function Initialize-TunnelServer {
 
     if ($Context.NoPki) {
         $Content = $Content -replace "##ARGS##", "-c ./letsencrypt.pem -k ./letsencrypt.key"
-    } else {
+    }
+    else {
         $Content = $Content -replace "##ARGS##", "-c ./serverchain.pem -k ./server.key"
     }
     
@@ -26,7 +27,7 @@ Function Initialize-TunnelServer {
 }
 
 Function Initialize-SetupScript {
-    try{
+    try {
         Write-Header "Generating setup script..."
         $Content = @"
         export intune_env=$($Context.Environment);
@@ -73,7 +74,8 @@ Function New-TunnelAgent {
 
     if (-Not $TenantCredential) {
         $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id)"
-    } else {
+    }
+    else {
         $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe Agent $($Context.TunnelSite.Id) '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
     }
 

@@ -9,11 +9,13 @@ Function Login-Graph {
     if ($GraphContext) {
         Write-Warning "Already signed into graph as $($GraphContext.Account)"
         Write-Warning "If you don't want to use this account, please logout, then run this script again."
-    } else {
+    }
+    else {
         Write-Header "Logging into graph..."
         if (-Not $TenantCredential) {
             $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe JWT"
-        } else {
+        }
+        else {
             $JWT = Invoke-Expression "mstunnel-utils/mstunnel-$($Context.RunningOS).exe JWT '$($TenantCredential.Username)' '$($TenantCredential.GetNetworkCredential().Password)'"
         }
         
@@ -120,7 +122,8 @@ Function New-ServicePrincipal {
         New-MgServicePrincipal -AppId $appId
         
         Write-Host "Successfully provisioned the Service Principal" -ForegroundColor Green
-    } catch [Exception] {
+    }
+    catch [Exception] {
         Write-Error "Error provisioning Service Principal"
         Write-Host $_.Exception.GetType().FullName, $_.Exception.Message
         Write-Host "Failed to provision the Service Principal" -ForegroundColor Red
@@ -465,7 +468,8 @@ Function New-IosAppConfigurationPolicy {
                     name  = "com.microsoft.tunnel.proxy_pacurl"
                     value = $PACUrl
                 })
-        } elseif ($ProxyHostname -ne "") {
+        }
+        elseif ($ProxyHostname -ne "") {
             $customSettings += @( @{
                     name  = "com.microsoft.tunnel.proxy_address"
                     value = $ProxyHostname
@@ -776,7 +780,8 @@ Function New-AndroidAppConfigurationPolicy {
                     name  = "com.microsoft.tunnel.proxy_pacurl"
                     value = $PACUrl
                 })
-        } elseif ($ProxyHostname -ne "") {
+        }
+        elseif ($ProxyHostname -ne "") {
             $customSettings += @( @{
                     name  = "com.microsoft.tunnel.proxy_address"
                     value = $ProxyHostname
