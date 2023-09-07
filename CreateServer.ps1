@@ -179,7 +179,10 @@ param(
     [Parameter(Mandatory = $false, ParameterSetName = "Create")]
     [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
     [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
-    [switch]$UseAllowList
+    [switch]$UseAllowList,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "CreateContext")]
+    [switch]$CreateFromContext
 )
 
 #region Helper Functions
@@ -221,6 +224,11 @@ Function Logout {
 
 Function Initialize {
     $script:Context = [TunnelContext]::new()
+
+    if ($CreateFromContext) {
+        $script:Context = Get-Content -Path "context.json" | ConvertFrom-Json
+        return
+    }
 
     if ($IsLinux) {
         $script:Context.RunningOS = "linux"
@@ -357,7 +365,10 @@ Function New-Profiles {
 #region Main Functions
 Function New-TunnelEnvironment {
     Login
-    Initialize-Variables
+    if (!$CreateFromContext) {
+        Initialize-Variables
+    }
+
     New-SSHKeys
 
     New-ServicePrincipal
@@ -418,7 +429,11 @@ Function New-TunnelEnvironment {
 
 Function New-SprintSignoffEnvironment {
     Login-Azure -VmTenantCredential $VmTenantCredential
-    Initialize-Variables
+
+    if (!$CreateFromContext) {
+        Initialize-Variables
+    }
+    
     New-SSHKeys
 
     New-ResourceGroup
@@ -527,6 +542,8 @@ Function New-Summary {
     }
 
     Write-Success "================================================="
+
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
 }
 
 Function Remove-TunnelEnvironment {
