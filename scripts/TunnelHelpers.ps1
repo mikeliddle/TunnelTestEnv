@@ -58,8 +58,8 @@ Class TunnelContext {
 }
 
 Class Constants {
-    $CertFileName = "cacert.pem.tmp"
-    $DefaultBypassUrls = @("www.google.com", "excluded", "excluded.$($Context.TunnelFQDN)")
+    static [string] $CertFileName = "cacert.pem.tmp"
+    static [string[]] $DefaultBypassUrls = @("www.google.com", "excluded", "excluded.$($Context.TunnelFQDN)")
 }
 
 Function Write-Header([string]$Message) {

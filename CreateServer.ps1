@@ -514,12 +514,12 @@ Function New-Summary {
         }
     }
 
-    Write-Success "DNS Server: $Context.ProxyIP"
+    Write-Success "DNS Server: $($Context.ProxyIP)"
     Write-Success "Default Search Suffix: $($Context.TunnelFQDN)"
     Write-Success ""
     Write-Success "Internal Endpoints: "
-    Write-Success "  http://$Context.ProxyIP - most stable for reachability check"
-    Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $ProxyIP"
+    Write-Success "  http://$($Context.ProxyIP) - most stable for reachability check"
+    Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $($Context.ProxyIP)"
     Write-Success "  https://excluded or https://excluded.$($Context.TunnelFQDN) - When using a proxy, this should show you a different IP than above"
     Write-Success "  https://$($Context.TunnelFQDN) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
     Write-Success "  https://untrusted or https://untrusted.$($Context.TunnelFQDN) - This endpoint should give you a certificate error"
@@ -533,7 +533,7 @@ Function New-Summary {
 
     Write-Success "================================================="
 
-    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context -Depth 10) -Force
 }
 
 Function Remove-TunnelEnvironment {

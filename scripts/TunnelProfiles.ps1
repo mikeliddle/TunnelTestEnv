@@ -283,7 +283,7 @@ Function New-IosAppProtectionPolicy {
         
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/targetApps" -Body $Body
         
-        Write-Header "Assigning App Protection policy '$DisplayName' to group '$Context.Group.Id'..."
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Context.Group.Id)'..."
         $Body = @{
             assignments = @(
                 @{
@@ -314,7 +314,8 @@ Function New-IosTrustedRootPolicy {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
     else {
-        $certValue = (Get-Content [Constants]::CertFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        $certFileName = [Constants]::CertFileName
+        $certValue = (Get-Content $certFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
             "@odata.type"          = "#microsoft.graph.iosTrustedRootCertificate"
@@ -521,7 +522,8 @@ Function New-AndroidTrustedRootPolicy {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
     else {
-        $certValue = (Get-Content [Constants]::CertFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        $certFileName = [Constants]::CertFileName
+        $certValue = (Get-Content $certFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
             "@odata.type"          = "#microsoft.graph.androidWorkProfileTrustedRootCertificate"
