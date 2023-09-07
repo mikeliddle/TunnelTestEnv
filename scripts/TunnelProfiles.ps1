@@ -283,7 +283,7 @@ Function New-IosAppProtectionPolicy {
         
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/targetApps" -Body $Body
         
-        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Context.Group.Id)'..."
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Context.Group.DisplayName)'..."
         $Body = @{
             assignments = @(
                 @{
@@ -662,7 +662,7 @@ Function New-AndroidAppProtectionPolicy {
         Write-Header "Creating App Protection policy '$DisplayName'..."
         $AndroidAppProtectionPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/androidManagedAppProtections" -Body $Body
         
-        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Group.DisplayName)'..."
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$($Context.Group.DisplayName)'..."
         $Body = @{
             assignments                 = @(
                 @{
