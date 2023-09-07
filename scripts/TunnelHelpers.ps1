@@ -1,9 +1,21 @@
+Enum Platform {
+    all
+    ios
+    android
+}
+
+Enum RunningOs {
+    win
+    mac
+    linux
+}
+
 Class TunnelContext {
     [string] $VmName
     [string] $ProxyVmName
     [string] $ResourceGroup
     [string] $Location = "westus"
-    [string] $Platform = "all"
+    [Platform] $Platform = "all"
     [string[]] $BundleIds = @()
     [string] $GroupName
     [string] $Environment = "PE"
@@ -20,8 +32,12 @@ Class TunnelContext {
     [bool] $UseInspection = $false
     [bool] $UseAllowList = $false
     [string] $PACUrl
-    [string] $RunningOS = "win"
+    [string] $ProxyHostname
+    [string] $ProxyPort
+    [RunningOs] $RunningOS = "win"
     [string] $SubscriptionId
+    [string] $TenantId
+    [string] $ADApplication
     [Object] $Subscription
     [Object] $Account
     [string] $SSHKeyPath = "$HOME/.ssh/$VmName"
@@ -39,6 +55,11 @@ Class TunnelContext {
     [string] $Subnet = "169.254.0.0/16"
     [string[]] $IncludeRoutes = @()
     [string[]] $ExcludeRoutes = @()
+}
+
+Class Constants {
+    $CertFileName = "cacert.pem.tmp"
+    $DefaultBypassUrls = @("www.google.com", "excluded", "excluded.$($Context.TunnelFQDN)")
 }
 
 Function Write-Header([string]$Message) {

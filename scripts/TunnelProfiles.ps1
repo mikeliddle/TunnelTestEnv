@@ -254,8 +254,7 @@ CONFIGURED_CLIENT_ID = $($AppId)
 #region Create iOS Functions
 Function New-IosAppProtectionPolicy {
     param(
-        [string] $DisplayName,
-        [string] $groupId
+        [string] $DisplayName
     )
 
     $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
@@ -284,12 +283,12 @@ Function New-IosAppProtectionPolicy {
         
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/iosManagedAppProtections('$($IosAppProtectionPolicy.Id)')/targetApps" -Body $Body
         
-        Write-Header "Assigning App Protection policy '$DisplayName' to group '$groupId'..."
+        Write-Header "Assigning App Protection policy '$DisplayName' to group '$Context.Group.Id'..."
         $Body = @{
             assignments = @(
                 @{
                     target = @{
-                        groupId                                    = $groupId
+                        groupId                                    = $Context.Group.Id
                         deviceAndAppManagementAssignmentFilterId   = $null
                         deviceAndAppManagementAssignmentFilterType = "none"
                         "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
@@ -306,9 +305,7 @@ Function New-IosAppProtectionPolicy {
 
 Function New-IosTrustedRootPolicy {
     param(
-        [string] $DisplayName,
-        [string] $certFileName,
-        [string] $GroupId
+        [string] $DisplayName
     )
 
     $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
@@ -317,7 +314,7 @@ Function New-IosTrustedRootPolicy {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
     else {
-        $certValue = (Get-Content $certFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        $certValue = (Get-Content [Constants]::CertFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
             "@odata.type"          = "#microsoft.graph.iosTrustedRootCertificate"
@@ -337,7 +334,7 @@ Function New-IosTrustedRootPolicy {
         $Body = @{
             "assignments" = @(@{
                     "target" = @{
-                        "groupId"     = $GroupId
+                        "groupId"     = $Context.Group.Id
                         "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
                     }
                 })
@@ -353,11 +350,7 @@ Function New-IosTrustedRootPolicy {
 
 Function New-IosDeviceConfigurationPolicy {
     param(
-        [string] $DisplayName,
-        [string] $PACUrl = "",
-        [string] $ProxyHostname = "",
-        [string] $ProxyPort = "",
-        [string] $GroupId
+        [string] $DisplayName
     )
 
     $IosDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
@@ -387,9 +380,9 @@ Function New-IosDeviceConfigurationPolicy {
             enableSplitTunneling  = $false
         }
 
-        if ($PACUrl -ne "" -or $ProxyHostname -ne "") {
+        if ($Context.PACUrl -ne "" -or $Context.ProxyHostname -ne "") {
             $Payload += @{
-                proxyServer = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+                proxyServer = if ($Context.PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$Context.PACUrl" } } else { @{ address = "$Context.ProxyHostname"; port = $Context.ProxyPort } }
             }
         }
 
@@ -400,7 +393,7 @@ Function New-IosDeviceConfigurationPolicy {
         $Body = @{
             "assignments" = @(@{
                     "target" = @{
-                        "groupId"     = $GroupId
+                        "groupId"     = $Context.Group.Id
                         "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
                     }
                 })
@@ -415,11 +408,7 @@ Function New-IosDeviceConfigurationPolicy {
 Function New-IosAppConfigurationPolicy {
     param(
         [string] $DisplayName,
-        $TrustedRootPolicy,
-        [string] $GroupId,
-        [string] $PACUrl = "",
-        [string] $ProxyHostname = "",
-        [string] $ProxyPort = ""
+        $TrustedRootPolicy
     )
 
     $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1 | ConvertFrom-Json
@@ -463,20 +452,20 @@ Function New-IosAppConfigurationPolicy {
             }
         )
 
-        if ($PACUrl -ne "") {
+        if ($Context.PACUrl -ne "") {
             $customSettings += @(@{
                     name  = "com.microsoft.tunnel.proxy_pacurl"
-                    value = $PACUrl
+                    value = $Context.PACUrl
                 })
         }
-        elseif ($ProxyHostname -ne "") {
+        elseif ($Context.ProxyHostname -ne "") {
             $customSettings += @( @{
                     name  = "com.microsoft.tunnel.proxy_address"
-                    value = $ProxyHostname
+                    value = $Context.ProxyHostname
                 },
                 @{
                     name  = "com.microsoft.tunnel.proxy_port"
-                    value = $ProxyPort
+                    value = $Context.ProxyPort
                 })
         }
 
@@ -496,7 +485,7 @@ Function New-IosAppConfigurationPolicy {
             assignments                 = @(
                 @{
                     target = @{
-                        groupId                                    = $GroupId
+                        groupId                                    = $Context.Group.Id
                         deviceAndAppManagementAssignmentFilterId   = $null
                         deviceAndAppManagementAssignmentFilterType = "none"
                         "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
@@ -523,9 +512,7 @@ Function New-IosAppConfigurationPolicy {
 #region Create Android Functions
 Function New-AndroidTrustedRootPolicy {
     param(
-        [string] $DisplayName,
-        [string] $certFileName,
-        [string] $GroupId
+        [string] $DisplayName
     )
 
     $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
@@ -534,7 +521,7 @@ Function New-AndroidTrustedRootPolicy {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
     }
     else {
-        $certValue = (Get-Content $certFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
+        $certValue = (Get-Content [Constants]::CertFileName).Replace("-----BEGIN CERTIFICATE-----", "").Replace("-----END CERTIFICATE-----", "") -join ""
         
         $Body = @{
             "@odata.type"          = "#microsoft.graph.androidWorkProfileTrustedRootCertificate"
@@ -554,7 +541,7 @@ Function New-AndroidTrustedRootPolicy {
         $Body = @{
             "assignments" = @(@{
                     "target" = @{
-                        "groupId"     = $GroupId
+                        "groupId"     = $Context.Group.Id
                         "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
                     }
                 })
@@ -568,11 +555,7 @@ Function New-AndroidTrustedRootPolicy {
 
 Function New-AndroidDeviceConfigurationPolicy {
     param(
-        [string] $DisplayName,
-        [string] $PACUrl = "",
-        [string] $ProxyHostname = "",
-        [string] $ProxyPort = "",
-        [string] $GroupId
+        [string] $DisplayName
     )
 
     $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
@@ -601,9 +584,9 @@ Function New-AndroidDeviceConfigurationPolicy {
                 })
         }
 
-        if ($PACUrl -ne "" -or $ProxyHostname -ne "") {
+        if ($Context.PACUrl -ne "" -or $Context.ProxyHostname -ne "") {
             $Payload += @{
-                proxyServer = if ($PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$PACUrl" } } else { @{ address = "$ProxyHostname"; port = $ProxyPort } }
+                proxyServer = if ($Context.PACUrl -ne "") { @{ automaticConfigurationScriptUrl = "$Context.PACUrl" } } else { @{ address = "$Context.ProxyHostname"; port = $Context.ProxyPort } }
             }
         }
 
@@ -614,7 +597,7 @@ Function New-AndroidDeviceConfigurationPolicy {
         $Body = @{
             "assignments" = @(@{
                     "target" = @{
-                        "groupId"     = $GroupId
+                        "groupId"     = $Context.Group.Id
                         "@odata.type" = "#microsoft.graph.groupAssignmentTarget"
                     }
                 })
@@ -628,8 +611,7 @@ Function New-AndroidDeviceConfigurationPolicy {
 
 Function New-AndroidAppProtectionPolicy {
     param(
-        [string] $DisplayName,
-        [string] $GroupId
+        [string] $DisplayName
     )
 
     $AndroidAppProtectionPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'"
@@ -683,7 +665,7 @@ Function New-AndroidAppProtectionPolicy {
             assignments                 = @(
                 @{
                     target = @{
-                        groupId                                    = $GroupId
+                        groupId                                    = $Context.Group.Id
                         deviceAndAppManagementAssignmentFilterId   = $null
                         deviceAndAppManagementAssignmentFilterType = "none"
                         "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
@@ -708,11 +690,7 @@ Function New-AndroidAppProtectionPolicy {
 Function New-AndroidAppConfigurationPolicy {
     param(
         [string] $DisplayName,
-        $TrustedRootPolicy,
-        [string] $GroupId,
-        [string] $PACUrl = "",
-        [string] $ProxyHostname = "",
-        [string] $ProxyPort = ""
+        $TrustedRootPolicy
     )
 
     $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
@@ -775,20 +753,20 @@ Function New-AndroidAppConfigurationPolicy {
             }
         )
 
-        if ($PACUrl -ne "") {
+        if ($Context.PACUrl -ne "") {
             $customSettings += @(@{
                     name  = "com.microsoft.tunnel.proxy_pacurl"
-                    value = $PACUrl
+                    value = $Context.PACUrl
                 })
         }
-        elseif ($ProxyHostname -ne "") {
+        elseif ($Context.ProxyHostname -ne "") {
             $customSettings += @( @{
                     name  = "com.microsoft.tunnel.proxy_address"
-                    value = $ProxyHostname
+                    value = $Context.ProxyHostname
                 },
                 @{
                     name  = "com.microsoft.tunnel.proxy_port"
-                    value = $ProxyPort
+                    value = $Context.ProxyPort
                 })
         }
 
@@ -826,7 +804,7 @@ Function New-AndroidAppConfigurationPolicy {
             assignments                 = @(
                 @{
                     target = @{
-                        groupId                                    = $GroupId
+                        groupId                                    = $Context.Group.Id
                         deviceAndAppManagementAssignmentFilterId   = $null
                         deviceAndAppManagementAssignmentFilterType = "none"
                         "@odata.type"                              = "#microsoft.graph.groupAssignmentTarget"
@@ -989,17 +967,13 @@ Function Remove-AndroidAppConfigurationPolicy {
 #region Scenario Functions
 Function New-IosProfiles {
     param(
-        [string] $certFileName,
-        [string] $GroupId,
-        [string] $PACUrl = "",
-        [string] $ProxyHostname = "",
-        [string] $ProxyPort = ""
+        [string] $certFileName
     )
 
-    $IosDeviceConfigurationPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$($Context.VmName)-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Context.TunnelSite -ServerConfiguration $Context.ServerConfiguration
-    $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$($Context.VmName)-APP" -GroupId $GroupId -BundleIds $Context.BundleIds
-    $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$($Context.VmName)-TR" -certFileName "cacert.pem.tmp" -GroupId $GroupId
-    $IosAppConfigurationPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$($Context.VmName)-appconfig" -GroupId $GroupId -Site $Context.TunnelSite -ServerConfiguration $Context.ServerConfiguration -TrustedRootPolicy $IosTrustedRootPolicy -BundleIds $Context.BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+    $IosDeviceConfigurationPolicy = New-IosDeviceConfigurationPolicy -DisplayName "ios-$($Context.VmName)-DC"
+    $IosAppProtectionPolicy = New-IosAppProtectionPolicy -DisplayName "ios-$($Context.VmName)-APP"
+    $IosTrustedRootPolicy = New-IosTrustedRootPolicy -DisplayName "ios-$($Context.VmName)-TR"
+    $IosAppConfigurationPolicy = New-IosAppConfigurationPolicy -DisplayName "ios-$($Context.VmName)-appconfig" -TrustedRootPolicy $IosTrustedRootPolicy
 }
 
 Function Remove-IosProfiles {
@@ -1011,17 +985,13 @@ Function Remove-IosProfiles {
 
 Function New-AndroidProfiles {
     param(
-        [string] $certFileName,
-        [string] $GroupId,
-        [string] $PACUrl = "",
-        [string] $ProxyHostname = "",
-        [string] $ProxyPort = ""
+        [string] $certFileName
     )
 
-    $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$($Context.VmName)-TR" -certFileName "cacert.pem.tmp" -GroupId $GroupId
-    $AndroidDeviceConfigurationPolicy = New-AndroidDeviceConfigurationPolicy -DisplayName "android-$($Context.VmName)-DC" -GroupId $GroupId -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort -Site $Context.TunnelSite -ServerConfiguration $Context.ServerConfiguration
-    $AndroidAppProtectionPolicy = New-AndroidAppProtectionPolicy -DisplayName "android-$($Context.VmName)-APP" -GroupId $GroupId -BundleIds $Context.BundleIds
-    $AndroidAppConfigurationPolicy = New-AndroidAppConfigurationPolicy -DisplayName "android-$($Context.VmName)-appconfig" -GroupId $GroupId -Site $Context.TunnelSite -ServerConfiguration $Context.ServerConfiguration -TrustedRootPolicy $AndroidTrustedRootPolicy -BundleIds $Context.BundleIds -PACUrl $PACUrl -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
+    $AndroidDeviceConfigurationPolicy = New-AndroidDeviceConfigurationPolicy -DisplayName "android-$($Context.VmName)-DC"
+    $AndroidAppProtectionPolicy = New-AndroidAppProtectionPolicy -DisplayName "android-$($Context.VmName)-APP"
+    $AndroidTrustedRootPolicy = New-AndroidTrustedRootPolicy -DisplayName "android-$($Context.VmName)-TR"
+    $AndroidAppConfigurationPolicy = New-AndroidAppConfigurationPolicy -DisplayName "android-$($Context.VmName)-appconfig" -TrustedRootPolicy $AndroidTrustedRootPolicy
 }
 
 Function Remove-AndroidProfiles {

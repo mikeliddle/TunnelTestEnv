@@ -332,32 +332,22 @@ Function Initialize-Variables {
 
 Function New-Profiles {
     if ($Context.NoProxy) {
-        $ProxyHostname = ""
-        $ProxyPort = ""
-        $PACUrl = ""
+        $script:Context.ProxyHostname = ""
+        $script:Context.ProxyPort = ""
+        $script:Context.PACUrl = ""
     }
     else {
         # TODO: If $TunnelVm doesn't resolve (due to being profiles only), then fetch it from the az cli
-        $ProxyHostname = $Context.TunnelFQDN
-        $ProxyPort = "3128"
-        $PACUrl = "http://$($Context.TunnelFQDN)/tunnel.pac"
+        $script:Context.ProxyHostname = $Context.TunnelFQDN
+        $script:Context.ProxyPort = "3128"
+        $script:Context.PACUrl = "http://$($Context.TunnelFQDN)/tunnel.pac"
     }
 
-    if ($Context.NoPACUrl) {
-        if ($Context.Platform -eq "ios" -or $Context.Platform -eq "all") {
-            New-IOSProfiles -GroupId $Context.Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
-        }
-        if ($Context.Platform -eq "android" -or $Context.Platform -eq "all") {
-            New-AndroidProfiles -GroupId $Context.Group.Id -ProxyHostname $ProxyHostname -ProxyPort $ProxyPort
-        }
+    if ($Context.Platform -eq "ios" -or $Context.Platform -eq "all") {
+        New-IOSProfiles
     }
-    else {
-        if ($Context.Platform -eq "ios" -or $Context.Platform -eq "all") {
-            New-IOSProfiles -GroupId $Context.Group.Id -PACUrl $PACUrl
-        }
-        if ($Context.Platform -eq "android" -or $Context.Platform -eq "all") {
-            New-AndroidProfiles -GroupId $Context.Group.Id -PACUrl $PACUrl
-        }
+    if ($Context.Platform -eq "android" -or $Context.Platform -eq "all") {
+        New-AndroidProfiles
     }
 }
 #endregion Helper Functions
@@ -433,7 +423,7 @@ Function New-SprintSignoffEnvironment {
     if (!$CreateFromContext) {
         Initialize-Variables
     }
-    
+
     New-SSHKeys
 
     New-ResourceGroup

@@ -21,7 +21,6 @@ Function Initialize-Proxy {
             foreach ($cred in $Context.AuthenticatedProxyCredentials) {
                 "$($cred.UserName):$($cred.GetNetworkCredential().Password)" | Add-Content $passwordsFile
             }
-            #htpasswd -bc $passwordsFile $ProxyCredential.Username $ProxyCredential.GetNetworkCredential().Password
             $basicAuthConfig = Get-Content $basicAuthFile -Raw
         }
         else {
@@ -58,7 +57,7 @@ Function Initialize-Proxy {
         (Get-Content $pacFile) -replace "##PROXY_URL##", "$ProxyURL" | out-file "$pacFile.tmp"
         $pacFile = "$pacFile.tmp"
 
-        $proxyBypassNames = ("www.google.com", "excluded.$($Context.TunnelFQDN)")
+        $proxyBypassNames = [Constants]::DefaultBypassUrls
         foreach ($name in $proxyBypassNames) {
             (Get-Content $pacFile) -replace "// PROXY_BYPASS_NAMES", "`nif (shExpMatch(host, '$($name)')) { return bypass; } // PROXY_BYPASS_NAMES" | out-file "$pacFile"
         }
