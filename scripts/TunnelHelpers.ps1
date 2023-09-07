@@ -6,7 +6,7 @@ Enum Platform {
 
 Enum RunningOs {
     win
-    mac
+    osx
     linux
 }
 
@@ -37,7 +37,7 @@ Class TunnelContext {
     [RunningOs] $RunningOS = "win"
     [string] $SubscriptionId
     [string] $TenantId
-    [string] $ADApplication
+    [string] $ADApplication = "Generated MAM Tunnel"
     [Object] $Subscription
     [Object] $Account
     [string] $SSHKeyPath = "$HOME/.ssh/$VmName"

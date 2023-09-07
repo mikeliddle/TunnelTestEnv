@@ -405,8 +405,8 @@ Function New-TunnelEnvironment {
 
     Update-PrivateDNSAddress
 
-    $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $Context.GraphContext.TenantId -BundleIds $Context.BundleIds
-    New-GeneratedXCConfig -bundle $Context.BundleIds[0] -AppId $AppRegistration.AppId -TenantId $Context.GraphContext.TenantId
+    $AppRegistration = Update-ADApplication
+    New-GeneratedXCConfig -AppId $AppRegistration.AppId
 
     New-Profiles
 
@@ -562,11 +562,11 @@ Function New-ProfilesOnlyEnvironment {
     Login
     Initialize-Variables
 
-    $ServerConfiguration = New-TunnelConfiguration -ServerConfigurationName $VmName -ListenPort $ListenPort -DnsServer $ProxyIP -IncludeRoutes $IncludeRoutes -ExcludeRoutes $ExcludeRoutes -DefaultDomainSuffix $TunnelVM.fqdns
-    $TunnelSite = New-TunnelSite -SiteName $VmName -FQDN $TunnelVM.fqdns -ServerConfiguration $ServerConfiguration
+    $ServerConfiguration = New-TunnelConfiguration
+    $TunnelSite = New-TunnelSite
 
-    $AppRegistration = Update-ADApplication -ADApplication $ADApplication -TenantId $GraphContext.TenantId -BundleIds $BundleIds
-    New-GeneratedXCConfig -bundle $BundleIds[0] -AppId $AppRegistration.AppId -TenantId $GraphContext.TenantId
+    $AppRegistration = Update-ADApplication
+    New-GeneratedXCConfig -AppId $AppRegistration.AppId
     
     New-Profiles
 

@@ -134,15 +134,11 @@ Function New-ServicePrincipal {
 
 #region iOS MAM Specific Functions
 Function Update-ADApplication {
-    param(
-        [string] $ADApplication,
-        [string] $TenantId
-    )
     
-    $App = Get-MgApplication -Filter "DisplayName eq '$ADApplication'" -Limit 1
+    $App = Get-MgApplication -Filter "DisplayName eq '$($Context.ADApplication)'" -Limit 1
     if ($App) {
         Write-Success "Client Id: $($App.AppId)"
-        Write-Success "Tenant Id: $($TenantId)"
+        Write-Success "Tenant Id: $($Context.GraphContext.TenantId)"
 
         if ($Context.BundleIds -and $Context.BundleIds.Count -gt 0) {
             Write-Header "Found AD Application '$ADApplication'..."
@@ -222,10 +218,10 @@ Function Update-ADApplication {
             RedirectUris = $uris
         }
         
-        $App = New-MgApplication -DisplayName $ADApplication -RequiredResourceAccess $RequiredResourceAccess -OptionalClaims $OptionalClaims -PublicClient $PublicClient -SignInAudience "AzureADMyOrg"
+        $App = New-MgApplication -DisplayName $Context.ADApplication -RequiredResourceAccess $RequiredResourceAccess -OptionalClaims $OptionalClaims -PublicClient $PublicClient -SignInAudience "AzureADMyOrg"
 
         Write-Success "Client Id: $($App.AppId)"
-        Write-Success "Tenant Id: $($TenantId)"
+        Write-Success "Tenant Id: $($Context.GraphContext.TenantId)"
 
         Write-Header "You will need to grant consent. Opening browser in 15 seconds..."
         Start-Sleep -Seconds 15
@@ -237,14 +233,11 @@ Function Update-ADApplication {
 
 Function New-GeneratedXCConfig {
     param(
-        [string[]] $bundle,
-        [string] $AppId,
-        [string] $TenantId
-
+        [string] $AppId
     )
     $Content = @"
-CONFIGURED_BUNDLE_IDENTIFIER = $bundle
-CONFIGURED_TENANT_ID = $($TenantId)
+CONFIGURED_BUNDLE_IDENTIFIER = $($Context.BundleIds[0])
+CONFIGURED_TENANT_ID = $($Context.GraphContext.TenantId)
 CONFIGURED_CLIENT_ID = $($AppId)
 "@
     Set-Content -Path "./Generated.xcconfig" -Value $Content -Force
