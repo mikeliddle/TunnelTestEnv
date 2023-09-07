@@ -533,7 +533,7 @@ Function New-Summary {
 
     Write-Success "================================================="
 
-    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context -Depth 10) -Force
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
 }
 
 Function Remove-TunnelEnvironment {
