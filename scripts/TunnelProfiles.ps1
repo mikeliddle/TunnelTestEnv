@@ -23,7 +23,7 @@ Function Login-Graph {
             Write-Error "Could not get JWT for account"
             Exit -1
         }
-
+        
         Connect-MgGraph -AccessToken $JWT | Out-Null
         
         # Switch to beta since most of our endpoints are there
