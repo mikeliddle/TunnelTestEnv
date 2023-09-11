@@ -1,6 +1,6 @@
 
 # Welcome to TunnelTestEnv
-The TunnelTestEnv Powershell script creates a full test environment for Microsoft Tunnel. The environment includes a Linux VM tunnel gateway server, and a second Linux VM that runs containers for a proxy server, a DNS server, and a web server. By default, an Intune tenant is also created, with tunnel profiles.
+The TunnelTestEnv Powershell script creates a full test environment for Microsoft Tunnel. The environment includes a Linux VM tunnel gateway server, and a second Linux VM that runs containers for a proxy server, a DNS server, and a web server. By default, an Intune tenant is also configured with tunnel profiles.
 
 TunnelTestEnv has been tested on MacOS and Windows. It can probably be made to run on Linux as well. The main script is named CreateServer.ps1.
 
@@ -102,10 +102,10 @@ To update the Configurations:
 2. If the Solution Explorer window is not open, in the top menu click View > Explorer.
 3. Open .vscode\launch.json.
 4. Note the TunnelTestEnv custom configurations: 
-   1.   Create TunnelTestEnv Servers: This configuration creates a complete test environment.
-   2.   Create TunnelTestEnv Signoff Servers: This configuration creates a test environment without the tenant, and without mstunnel-setup being run on the server VM.
-   3.   Delete TunnelTestEnv Servers: This configuration deletes the test environment.
-5. Modify an existing configuration, or if you want, you can create new configurations. At the very least, change the VM name from "MyVmName" in the args of both the Create and Delete configurations.
+   1.   Create TunnelTestEnv: This configuration creates a complete test environment and configures a tenant.
+   2.   Create Signoff TunnelTestEnv: This configuration creates a test environment without configuring a tenant, and without mstunnel-setup being run on the server VM.
+   3.   Delete TunnelTestEnv: This configuration deletes the test environment.
+5. Modify an existing configuration, or if you want, you can create new configurations. It is recommended that you provide at least a subscription ID and a VM name, but you may also want to add other command-line parameters.
 
 ### Select a Configuration
 1. In Visual Studio Code, open the Run and Debug view (View > Run).

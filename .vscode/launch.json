@@ -7,25 +7,25 @@
         {
             "type": "PowerShell",
             "request": "launch",
-            "name": "Create TunnelTestEnv Servers",
+            "name": "Create TunnelTestEnv",
             "script": "${file}",
-            "args": ["-SprintSignoff -SubscriptionId 34f2279c-2de9-44d7-98c6-e0533cd70bd8 -VmName myVMName"],
+            "args": ["-SubscriptionId <mySubscriptionID> -VmName <myVMName> -GroupName <myGroupName>"],
             "cwd": "D:\\TunnelTestEnv"
         },
         {
             "type": "PowerShell",
             "request": "launch",
-            "name": "Create TunnelTestEnv Signoff Servers",
+            "name": "Create Signoff TunnelTestEnv",
             "script": "${file}",
-            "args": ["-SprintSignoff -SubscriptionId 34f2279c-2de9-44d7-98c6-e0533cd70bd8 -VmName myVMName"],
+            "args": ["-SprintSignoff -SubscriptionId <mySubscriptionID> -VmName <myVMName>"],
             "cwd": "D:\\TunnelTestEnv"
         },
         {
             "type": "PowerShell",
             "request": "launch",
-            "name": "Delete TunnelTestEnv Servers",
+            "name": "Delete TunnelTestEnv",
             "script": "${file}",
-            "args": ["-Delete -SubscriptionId 34f2279c-2de9-44d7-98c6-e0533cd70bd8 -VmName myVMName"],
+            "args": ["-Delete -SubscriptionId <mySubscriptionID> -VmName <myVMName>"],
             "cwd": "D:\\TunnelTestEnv"
         },        {
             "type": "PowerShell",
