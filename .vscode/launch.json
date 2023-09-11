@@ -6,6 +6,29 @@
     "configurations": [
         {
             "type": "PowerShell",
+            "request": "launch",
+            "name": "Create TunnelTestEnv",
+            "script": "${file}",
+            "args": ["-SubscriptionId <mySubscriptionID> -VmName <myVMName> -GroupName <myGroupName>"],
+            "cwd": "D:\\TunnelTestEnv"
+        },
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "Create Signoff TunnelTestEnv",
+            "script": "${file}",
+            "args": ["-SprintSignoff -SubscriptionId <mySubscriptionID> -VmName <myVMName>"],
+            "cwd": "D:\\TunnelTestEnv"
+        },
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "Delete TunnelTestEnv",
+            "script": "${file}",
+            "args": ["-Delete -SubscriptionId <mySubscriptionID> -VmName <myVMName>"],
+            "cwd": "D:\\TunnelTestEnv"
+        },        {
+            "type": "PowerShell",
             "request": "attach",
             "name": "PowerShell Attach to Host Process",
             "processId": "${command:PickPSHostProcess}",
