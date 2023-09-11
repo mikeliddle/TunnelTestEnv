@@ -1,7 +1,15 @@
+
+# Welcome to TunnelTestEnv
+The TunnelTestEnv Powershell script creates a full test environment for Microsoft Tunnel. The environment includes a Linux VM tunnel gateway server, and a second Linux VM that runs containers for a proxy server, a DNS server, and a web server. By default, an Intune tenant is also created, with tunnel profiles.
+
+TunnelTestEnv has been tested on MacOS and Windows. It can probably be made to run on Linux as well. The main script is named CreateServer.ps1.
+
+The TunnelTestEnv scripts were written by Mike Liddle, based on previous scripts written by Yasir Ibrahim, with input for others.
+
 # How To run
 
 ## Automate everything
-
+To quicky download and run the scripts:
 1. Clone this repo to your local machine.
 2. Ensure powershell core and az cli are installed on your machine.
 3. Run `./CreateServer.ps1` with the necessary parameters.
@@ -10,7 +18,7 @@
 4. Clean up the environment by running `./CreateServer.ps1 -Delete -VmName <name>`
 
 ## Automate just the services (No profiles or Tunnel)
-
+To create a test environment ready for running the sprint signoff tests:
 1. Clone this repo to your local machine.
 2. Ensure powershell core and az cli are installed on your machine.
 3. Run `./CreateServer.ps1 -SprintSignoff` with the necessary parameters.
@@ -65,7 +73,7 @@ Switches:
 - `-Centos7` - Uses the Centos 7.9 image from OpenLogic for the Tunnel VM.
 
 ## Environment explanation
-
+The test environment will consist of the following components:
 1. Trusted - An NGINX server with a TLS certificate issued by our generated CA.
 2. Untrusted - An NGINX server with a self signed TLS certificate.
 3. LetsEncrypt - An NGINX server with a publicly trusted TLS certificate (uses the VM FQDN for it's server name).
@@ -77,3 +85,35 @@ Switches:
 All these servers are available at the address `https://\<hostname\>.\<fqdn\>`. The webApp container will show you your origin IP, which will either be the proxy IP or the Tunnel Gateway IP depending on if you are using the proxy or not.
 
 Since we are using a DNS server to override public entries, we also have default search domains available. This means you can access all of the resources by hostname instead of needing the FQDN. As a note, you will need to specify the protocol (https), otherwise, your browser will try to search for the hostname instead of lookup and navigate. For example, `https://webapp` will work, but `webapp` will likely not. 
+
+## Debugging the scripts
+You can debug the PowerShell scripts in Visual Studio Code.
+
+### First-time Setup
+1. Install Visual Studio Code.
+2. Clone the TunnelTestEnv scripts as explained above.
+3. Launch Visual Studio Code.
+4. If the Code PowerShell Extension is not installed, install it by clicking View > Extensions then type "Powershell" in the search box, and select the PowerShell extension. More info is at https://code.visualstudio.com/docs/languages/powershell.
+
+### Debug Configurations
+Debugging a PowerShell script with command-line parameters is done with Configurations. The Configurations are stored in the TunnelTestEnv\.vscode\launch.json file. The first three configurations in that file are customized for TunnelTestEnv, and they have "TunnelTestEnv" in their names. 
+To update the Configurations:
+1. In Visual Studio Code, select File > Open Folder..., browse to and select the TunnelTestEnv folder, then click "Select Folder". 
+2. If the Solution Explorer window is not open, in the top menu click View > Explorer.
+3. Open .vscode\launch.json.
+4. Note the TunnelTestEnv custom configurations: 
+   1.   Create TunnelTestEnv Servers: This configuration creates a complete test environment.
+   2.   Create TunnelTestEnv Signoff Servers: This configuration creates a test environment without the tenant, and without mstunnel-setup being run on the server VM.
+   3.   Delete TunnelTestEnv Servers: This configuration deletes the test environment.
+5. Modify an existing configuration, or if you want, you can create new configurations. At the very least, change the VM name from "MyVmName" in the args of both the Create and Delete configurations.
+
+### Select a Configuration
+1. In Visual Studio Code, open the Run and Debug view (View > Run).
+2. Find the Configuration dropdown at the top of the Run and Debug view, to the right of the "RUN AND DEBUG" title.
+3. Click the Configuration dropdown and select one of the custom configurations. 
+ 
+### Debugging the scripts
+1. In Visual Studio Code, if the Solution Explorer window is not open, in the top menu click View > Explorer.
+2. Open CreateServer.ps1.
+3. Set breakpoints by pressing F9. A good place for a starting breakpoint is at the Test-Prerequisites command or the Initialize command at around line 600.
+4. Press F5 to start debugging.
