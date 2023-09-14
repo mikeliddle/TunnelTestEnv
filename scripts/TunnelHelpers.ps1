@@ -56,7 +56,6 @@ Class TunnelContext {
     [string[]] $IncludeRoutes = @()
     [string[]] $ExcludeRoutes = @()
     [bool] $BootDiagnostics = $false
-    [string] $AzureStorageAccountName
 }
 
 Class Constants {

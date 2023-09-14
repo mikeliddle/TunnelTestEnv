@@ -82,11 +82,11 @@ Function New-Network {
 
 Function New-TunnelVM {    
     Write-Header "Creating VM '$($Context.VmName)'..."
-    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors @AdditionalParams | Out-Null
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
 
     if ($Context.BootDiagnostics) {
         Write-Header "Enabling boot diagnostics..."
-        az vm boot-diagnostics enable --resource-group $Context.ResourceGroup --name $Context.VmName #--storage $script:Context.AzureStorageAccountName
+        az vm boot-diagnostics enable --resource-group $Context.ResourceGroup --name $Context.VmName
     }
 }
 
