@@ -58,7 +58,7 @@ param(
     [Parameter(Mandatory = $false, ParameterSetName = "Create")]
     [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
     [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
-    [string]$Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
+    [string]$Image = "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest",
     
     [Parameter(Mandatory = $false, ParameterSetName = "Create")]
     [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
@@ -124,6 +124,7 @@ param(
     [pscredential]$TenantCredential,
 
     [Parameter(Mandatory = $true, ParameterSetName = "Delete")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$Delete,
 
     [Parameter(Mandatory = $true, ParameterSetName = "ProfilesOnly")]
@@ -182,7 +183,12 @@ param(
     [switch]$UseAllowList,
 
     [Parameter(Mandatory = $false, ParameterSetName = "CreateContext")]
-    [switch]$CreateFromContext
+    [switch]$CreateFromContext,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [switch]$BootDiagnostics
 )
 
 #region Helper Functions
@@ -206,24 +212,28 @@ Function Test-Prerequisites {
 }
 
 Function Login {
-    $script:Context.SubscriptionId = $SubscriptionId
     if (-Not $ProfilesOnly) {
         Login-Azure -VmTenantCredential $VmTenantCredential
     }
     
-    Login-Graph -TenantCredential $TenantCredential
+    if (-Not $SprintSignoff) {
+        Login-Graph -TenantCredential $TenantCredential
+    }
 }
 
 Function Logout {
     if (-Not $StayLoggedIn) {
         Write-Header "Logging out..."
         az logout
-        $script:Account = Disconnect-MgGraph
+        if (-Not $SprintSignoff) {
+            $script:Account = Disconnect-MgGraph
+        }
     }
 }
 
 Function Initialize {
     $script:Context = [TunnelContext]::new()
+    $script:Context.SubscriptionId = $SubscriptionId
 
     if ($CreateFromContext) {
         $script:Context = Get-Content -Path "context.json" | ConvertFrom-Json
@@ -250,7 +260,7 @@ Function Initialize {
         $script:Context.Image = "OpenLogic:CentOS:7_9:latest"
     }
     else {
-        $script:Context.Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+        $script:Context.Image = "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest"
     }
     
     if ($NoPki) {
@@ -271,10 +281,17 @@ Function Initialize {
         $script:Context.NoProxy = $true
         $script:Context.NoPki = $true
     }
+
+    if ($BootDiagnostics) {
+        $script:Context.BootDiagnostics = $true
+    }
+    else {
+        $script:Context.BootDiagnostics = $false
+    }
 }
 
 Function Initialize-Variables {
-    $script:Context.VmName = $VmName.ToLower()
+    $script:Context.VmName = $VmName = $VmName.ToLower()    # Force $VmName to lower case since we don't want $VmName and $Context.VmName to be different.
     $script:Context.ProxyVmName = $Context.VmName + "-server"
     $script:Context.Location = $Location
     $script:Context.Environment = $Environment
@@ -543,12 +560,14 @@ Function Remove-TunnelEnvironment {
     Remove-ResourceGroup -resourceGroup "$VmName-group"
     Remove-SSHKeys -SSHKeyPath "$HOME/.ssh/$VmName" -TunnelFQDN "$VmName.$Location.cloudapp.azure.com" -ServiceFQDN "$VmName-server.$Location.cloudapp.azure.com"
 
-    Remove-IosProfiles -VmName $VmName
-    Remove-AndroidProfiles -VmName $VmName
+    if (-Not $SprintSignoff) {
+        Remove-IosProfiles -VmName $VmName
+        Remove-AndroidProfiles -VmName $VmName
 
-    Remove-TunnelServers -SiteName $VmName
-    Remove-TunnelSite -SiteName $VmName
-    Remove-TunnelConfiguration -ServerConfigurationName $VmName
+        Remove-TunnelServers -SiteName $VmName
+        Remove-TunnelSite -SiteName $VmName
+        Remove-TunnelConfiguration -ServerConfigurationName $VmName
+    }
 
     Remove-TempFiles
 
