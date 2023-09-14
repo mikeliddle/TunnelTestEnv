@@ -4,7 +4,7 @@ The TunnelTestEnv Powershell script creates a full test environment for Microsof
 
 TunnelTestEnv has been tested on MacOS and Windows. It can probably be made to run on Linux as well. The main script is named CreateServer.ps1.
 
-The TunnelTestEnv scripts were written by Mike Liddle, based on previous scripts written by Yasir Ibrahim, with input for others.
+The TunnelTestEnv scripts were written by Mike Liddle, based on previous scripts written by Yasir Ibrahim and Todd Bohman, with input for others.
 
 # How To run
 
@@ -15,7 +15,7 @@ To quicky download and run the scripts:
 3. Run `./CreateServer.ps1` with the necessary parameters.
    - Example: ./CreateServer.ps1 -VmName mstunnel-test -BundleIds com.microsoft.scmx -GroupName myusergroup
    - You will be prompted first to sign-in with an Azure account to create the VMs, then twice to authenticate to your Intune tenant for setting up the Tunnel configuration and profiles.
-4. Clean up the environment by running `./CreateServer.ps1 -Delete -VmName <name>`
+4. Clean up the environment by running `./CreateServer.ps1 -Delete -VmName <name>`. Note that deleting an Azure resource group takes a few minutes, so if you create again after deleting, you may need to wait or change the VmName.
 
 ## Automate just the services (No profiles or Tunnel)
 To create a test environment ready for running the sprint signoff tests:
@@ -41,7 +41,7 @@ Optional Parameters:
 - `-Location`: The azure region to create the VM in. Default is `westus`.
 - `-Size`: The size of the VM to create. Default is `Standard_B2s`.
 - `-ProxySize`: The size of the proxy VM to create. Default is `Standard_B2s`.
-- `-Image`: The image to use for the VM. Default is `Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest`.
+- `-Image`: The image to use for the VM. Default is `Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest`.
 - `-Environment`: The Intune cloud environment to use. Default is `PE`.
 - `-Email`: The email address to use for the Let's Encrypt certificate. Default is to detect this from the VM login information.
 - `-Username`: The Username to use for the VM. Default is `azureuser`.
@@ -71,6 +71,7 @@ Switches:
 - `-RHEL8` - Uses the RHEL 8 lvm image for the Tunnel VM.
 - `-RHEL7` - Uses the RHEL 7 lvm image for the Tunnel VM.
 - `-Centos7` - Uses the Centos 7.9 image from OpenLogic for the Tunnel VM.
+- `-BootDiagnostics` - Turn on boot diagnostics on the Tunnel VM.
 
 ## Environment explanation
 The test environment will consist of the following components:
@@ -96,15 +97,16 @@ You can debug the PowerShell scripts in Visual Studio Code.
 4. If the Code PowerShell Extension is not installed, install it by clicking View > Extensions then type "Powershell" in the search box, and select the PowerShell extension. More info is at https://code.visualstudio.com/docs/languages/powershell.
 
 ### Debug Configurations
-Debugging a PowerShell script with command-line parameters is done with Configurations. The Configurations are stored in the TunnelTestEnv\.vscode\launch.json file. The first three configurations in that file are customized for TunnelTestEnv, and they have "TunnelTestEnv" in their names. 
+Debugging a PowerShell script with command-line parameters is done with Configurations. The Configurations are stored in the ...\TunnelTestEnv\.vscode\launch.json file. The four configurations in that file are customized for TunnelTestEnv.
 To update the Configurations:
 1. In Visual Studio Code, select File > Open Folder..., browse to and select the TunnelTestEnv folder, then click "Select Folder". 
 2. If the Solution Explorer window is not open, in the top menu click View > Explorer.
 3. Open .vscode\launch.json.
 4. Note the TunnelTestEnv custom configurations: 
    1.   Create TunnelTestEnv: This configuration creates a complete test environment and configures a tenant.
-   2.   Create Signoff TunnelTestEnv: This configuration creates a test environment without configuring a tenant, and without mstunnel-setup being run on the server VM.
-   3.   Delete TunnelTestEnv: This configuration deletes the test environment.
+   2.   Delete TunnelTestEnv: This configuration deletes the test environment.
+   3.   Create Signoff TunnelTestEnv: This configuration creates a test environment without configuring a tenant, and without mstunnel-setup being run on the server VM.
+   4.   Delete Signoff TunnelTestEnv: This configuration deletes the signoff test environment.
 5. Modify an existing configuration, or if you want, you can create new configurations. It is recommended that you provide at least a subscription ID and a VM name, but you may also want to add other command-line parameters.
 
 ### Select a Configuration
@@ -114,6 +116,6 @@ To update the Configurations:
  
 ### Debugging the scripts
 1. In Visual Studio Code, if the Solution Explorer window is not open, in the top menu click View > Explorer.
-2. Open CreateServer.ps1.
-3. Set breakpoints by pressing F9. A good place for a starting breakpoint is at the Test-Prerequisites command or the Initialize command at around line 600.
-4. Press F5 to start debugging.
+2. Open CreateServer.ps1 or one of the scripts in the scripts folder. 
+3. Set breakpoints by pressing F9. A good place for a starting breakpoint is at Initialize command at around line 600 in CreateServer.ps1.
+4. Press F5 to start debugging, then use F10 to step over, F11 to step into, and the other standard Visual Studio debugging commands.
