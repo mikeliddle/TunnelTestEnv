@@ -23,8 +23,8 @@ Class TunnelContext {
     [string] $Username = "azureuser"
     [string] $Size = "Standard_B2s"
     [string] $ProxySize = "Standard_B2s"
-    [string] $Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
-    [string] $ProxyImage = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest"
+    [string] $Image = "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest"
+    [string] $ProxyImage = "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest"
     [bool] $NoProxy = $false
     [bool] $WithSSHOpen = $false
     [bool] $NoPACUrl = $false
@@ -55,6 +55,7 @@ Class TunnelContext {
     [string] $Subnet = "169.254.0.0/16"
     [string[]] $IncludeRoutes = @()
     [string[]] $ExcludeRoutes = @()
+    [bool] $BootDiagnostics = $false
 }
 
 Class Constants {

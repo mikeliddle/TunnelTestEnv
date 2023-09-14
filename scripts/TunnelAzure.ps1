@@ -31,16 +31,16 @@ Function Login-Azure {
         Write-Header "Setting subscription to $($Context.SubscriptionId)"
         az account set --subscription $Context.SubscriptionId | Out-Null
     }
-    elseif ($accounts[0].id -ne $Context.SubscriptionId) {
+    elseif ($Context.SubscriptionId -And $accounts[0].id -ne $Context.SubscriptionId) {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
-        Write-Warning "If you don't want to use this account, please logout, then run this script again."
+        Write-Warning "If you don't want to use this account, please run 'az logout', then run this script again."
         Write-Header "Setting subscription to $($Context.SubscriptionId)"
         az account set --subscription $Context.SubscriptionId | Out-Null
     }
     else {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
         Write-Warning "Using subscription $($accounts[0].id)"
-        Write-Warning "If you don't want to use this account, please logout, then run this script again."
+        Write-Warning "If you don't want to use this account, please run 'az logout', then run this script again."
     }
 }
 Function New-ResourceGroup {
@@ -83,6 +83,11 @@ Function New-Network {
 Function New-TunnelVM {    
     Write-Header "Creating VM '$($Context.VmName)'..."
     az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
+
+    if ($Context.BootDiagnostics) {
+        Write-Header "Enabling boot diagnostics..."
+        az vm boot-diagnostics enable --resource-group $Context.ResourceGroup --name $Context.VmName
+    }
 }
 
 Function New-NetworkRules {
