@@ -204,7 +204,10 @@ Function Test-Prerequisites {
         Write-Header "Installing Microsoft.Graph..."
         Install-Module Microsoft.Graph -Force -RequiredVersion 1.28.0
     }
-    Import-Module Microsoft.Graph -RequiredVersion 1.28.0
+    
+    if (-Not $SprintSignoff) {
+        Import-Module Microsoft.Graph -RequiredVersion 1.28.0
+    }
 
     if (-Not ($PSVersionTable.PSVersion.Major -ge 6)) {
         Write-Error "Please use PowerShell Core 6 or later."
@@ -449,7 +452,7 @@ Function New-SprintSignoffEnvironment {
     New-TunnelVM
     New-ServiceVM
 
-    $script:ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
+    $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
 
     if (-Not $Simple) {
         New-AdvancedNetworkRules
