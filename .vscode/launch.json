@@ -25,7 +25,7 @@
             "request": "launch",
             "name": "Create Signoff TunnelTestEnv",
             "script": ".\\CreateServer.ps1",
-            "args": ["-SprintSignoff -SubscriptionId <mySubscriptionId> -BootDiagnostics -VmName <myVMName>"],
+            "args": ["-SprintSignoff -SubscriptionId <mySubscriptionId> -Image RedHat:RHEL:9-LVM:latest-BootDiagnostics -VmName <myVMName>"],
             "cwd": "${workspaceRoot}"
         },
         {
