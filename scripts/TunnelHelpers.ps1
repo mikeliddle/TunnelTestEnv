@@ -67,6 +67,7 @@ Class Constants {
 Function Set-Endpoints() {
     $script:Context.SupportedEndpoints = @(
         @{label= "RequireCert"; url= "https://cert.$($Context.DomainName)"},
+        @{label= "OptionalCert"; url= "https://optionalcert.$($Context.DomainName)"},
         @{label= "FetchCert"; url= "https://$($Context.DomainName)/user.pfx"},
         @{label= "Webapp"; url= "https://webapp.$($Context.DomainName)"},
         @{label= "Excluded"; url= "https://excluded.$($Context.DomainName)"},

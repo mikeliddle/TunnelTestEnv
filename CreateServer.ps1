@@ -550,7 +550,10 @@ Function New-Summary {
     Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $($Context.ProxyIP)"
     Write-Success "  https://excluded or https://excluded.$($Context.TunnelFQDN) - When using a proxy, this should show you a different IP than above"
     Write-Success "  https://$($Context.TunnelFQDN) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
+    Write-Success "  https://cert or https://cert.$($Context.TunnelFQDN) - This endpoint requires a client certificate"
+    Write-Success "  https://optionalcert or https://optionalcert.$($Context.TunnelFQDN) - This endpoint prompts for a client certificate but does not require it"
     Write-Success "  https://untrusted or https://untrusted.$($Context.TunnelFQDN) - This endpoint should give you a certificate error"
+
 
     if ($SprintSignoff) {
         Write-Success ""
