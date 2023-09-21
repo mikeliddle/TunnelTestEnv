@@ -33,7 +33,7 @@
             "request": "launch",
             "name": "Delete Signoff TunnelTestEnv",
             "script": ".\\CreateServer.ps1",
-            "args": ["-Delete -SubscriptionId <mySubscriptionId> -SprintSignoff -VmName <myVMName>"],
+            "args": ["-DeleteSprintSignoff -SubscriptionId <mySubscriptionId> -SprintSignoff -VmName <myVMName>"],
             "cwd": "${workspaceRoot}"
         },
     ]

@@ -124,8 +124,10 @@ param(
     [pscredential]$TenantCredential,
 
     [Parameter(Mandatory = $true, ParameterSetName = "Delete")]
-    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$Delete,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [switch]$DeleteSprintSignoff,
 
     [Parameter(Mandatory = $true, ParameterSetName = "ProfilesOnly")]
     [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
@@ -200,13 +202,14 @@ Function Test-Prerequisites {
         Exit 1
     }
     
-    if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph")) {
-        Write-Header "Installing Microsoft.Graph..."
-        Install-Module Microsoft.Graph -Force -RequiredVersion 1.28.0
-    }
-    
     if (-Not $SprintSignoff) {
-        Import-Module Microsoft.Graph -RequiredVersion 1.28.0
+        if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph.Beta")) {
+            Write-Header "Installing Microsoft.Graph..."
+            Install-Module Microsoft.Graph -Force -MinimumVersion 2.61
+            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion 2.61
+        }
+
+        Import-Module Microsoft.Graph.Beta -MinimumVersion 2.61
     }
 
     if (-Not ($PSVersionTable.PSVersion.Major -ge 6)) {
@@ -409,6 +412,8 @@ Function New-TunnelEnvironment {
     # Setup DNS
     New-DnsServer
     # Setup WebServers
+    Set-Endpoints
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
     New-NginxSetup
 
     Update-RebootVM
@@ -472,6 +477,8 @@ Function New-SprintSignoffEnvironment {
     # Setup DNS
     New-DnsServer
     # Setup WebServers
+    Set-Endpoints
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
     New-NginxSetup
 
     Update-RebootVM
@@ -633,6 +640,9 @@ if ($Delete) {
     else {
         Remove-TunnelEnvironment
     }
+}
+elseif ($DeleteSprintSignoff) {
+    Remove-TunnelEnvironment
 }
 elseif ($SprintSignoff) {
     New-SprintSignoffEnvironment

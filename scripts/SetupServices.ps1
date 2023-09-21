@@ -26,6 +26,7 @@ Function New-NginxSetup {
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/createWebservers.sh "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx.conf.d "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" -r ./nginx_data "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
+    scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" -r context.json "$($Context.Username)@$($Context.ServiceFQDN):~/nginx_data/context.json" > $null
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/getPublicCert.sh "$($Context.Username)@$($Context.TunnelFQDN):~/" > $null
 
     Write-Header "Getting public certificate"
