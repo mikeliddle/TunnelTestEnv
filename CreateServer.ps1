@@ -205,11 +205,11 @@ Function Test-Prerequisites {
     if (-Not $SprintSignoff) {
         if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph.Beta")) {
             Write-Header "Installing Microsoft.Graph..."
-            Install-Module Microsoft.Graph -Force -MinimumVersion 2.61
-            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion 2.61
+            Install-Module Microsoft.Graph -Force -MinimumVersion 2.6.1
+            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion 2.6.1
         }
 
-        Import-Module Microsoft.Graph.Beta -MinimumVersion 2.61
+        Import-Module Microsoft.Graph.Beta -MinimumVersion 2.6.1
     }
 
     if (-Not ($PSVersionTable.PSVersion.Major -ge 6)) {
