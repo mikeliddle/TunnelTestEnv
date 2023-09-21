@@ -554,7 +554,6 @@ Function New-Summary {
     Write-Success "  https://optionalcert or https://optionalcert.$($Context.TunnelFQDN) - This endpoint prompts for a client certificate but does not require it"
     Write-Success "  https://untrusted or https://untrusted.$($Context.TunnelFQDN) - This endpoint should give you a certificate error"
 
-
     if ($SprintSignoff) {
         Write-Success ""
         Write-Success "Trusted Certificate Path: cacert.pem.tmp"
