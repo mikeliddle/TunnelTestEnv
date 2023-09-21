@@ -280,14 +280,21 @@ Function New-GeneratedXCConfig {
     param(
         [string[]] $bundle,
         [string] $AppId,
-        [string] $TenantId
-
+        [string] $TenantId,
+        [pscredential] $TenantCredentials = $null
     )
     $Content = @"
 CONFIGURED_BUNDLE_IDENTIFIER = $bundle
 CONFIGURED_TENANT_ID = $($TenantId)
 CONFIGURED_CLIENT_ID = $($AppId)
 "@
+
+    if ($TenantCredentials) {
+        $Content += @"
+        TENANT_USERNAME = $($TenantCredentials.UserName)
+        TENANT_PASSWORD = $($TenantCredentials.GetNetworkCredential().Password)
+"@
+    }
     Set-Content -Path "./Generated.xcconfig" -Value $Content -Force
 }
 #endregion iOS MAM Specific Functions
