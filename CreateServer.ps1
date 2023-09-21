@@ -124,8 +124,10 @@ param(
     [pscredential]$TenantCredential,
 
     [Parameter(Mandatory = $true, ParameterSetName = "Delete")]
-    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
     [switch]$Delete,
+
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [switch]$DeleteSprintSignoff,
 
     [Parameter(Mandatory = $true, ParameterSetName = "ProfilesOnly")]
     [Parameter(Mandatory = $false, ParameterSetName = "Delete")]
@@ -200,13 +202,14 @@ Function Test-Prerequisites {
         Exit 1
     }
     
-    if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph")) {
-        Write-Header "Installing Microsoft.Graph..."
-        Install-Module Microsoft.Graph -Force -RequiredVersion 1.28.0
-    }
-    
     if (-Not $SprintSignoff) {
-        Import-Module Microsoft.Graph -RequiredVersion 1.28.0
+        if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph.Beta")) {
+            Write-Header "Installing Microsoft.Graph..."
+            Install-Module Microsoft.Graph -Force -MinimumVersion 2.6.1
+            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion 2.6.1
+        }
+
+        Import-Module Microsoft.Graph.Beta -MinimumVersion 2.6.1
     }
 
     if (-Not ($PSVersionTable.PSVersion.Major -ge 6)) {
@@ -409,6 +412,8 @@ Function New-TunnelEnvironment {
     # Setup DNS
     New-DnsServer
     # Setup WebServers
+    Set-Endpoints
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
     New-NginxSetup
 
     Update-RebootVM
@@ -472,6 +477,8 @@ Function New-SprintSignoffEnvironment {
     # Setup DNS
     New-DnsServer
     # Setup WebServers
+    Set-Endpoints
+    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
     New-NginxSetup
 
     Update-RebootVM
@@ -543,6 +550,8 @@ Function New-Summary {
     Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $($Context.ProxyIP)"
     Write-Success "  https://excluded or https://excluded.$($Context.TunnelFQDN) - When using a proxy, this should show you a different IP than above"
     Write-Success "  https://$($Context.TunnelFQDN) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
+    Write-Success "  https://cert or https://cert.$($Context.TunnelFQDN) - This endpoint requires a client certificate"
+    Write-Success "  https://optionalcert or https://optionalcert.$($Context.TunnelFQDN) - This endpoint prompts for a client certificate but does not require it"
     Write-Success "  https://untrusted or https://untrusted.$($Context.TunnelFQDN) - This endpoint should give you a certificate error"
 
     if ($SprintSignoff) {
@@ -633,6 +642,9 @@ if ($Delete) {
     else {
         Remove-TunnelEnvironment
     }
+}
+elseif ($DeleteSprintSignoff) {
+    Remove-TunnelEnvironment
 }
 elseif ($SprintSignoff) {
     New-SprintSignoffEnvironment

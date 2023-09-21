@@ -25,7 +25,7 @@ To create a test environment ready for running the sprint signoff tests:
    - Example: ./CreateServer.ps1 -SprintSignoff -VmName mstunnel-test
    - You will only be prompted to sign-in with an Azure account to create the VMs.
    - You also don't need BundleIds or GroupName since no profiles will be created.
-4. Clean up the environment by running `./CreateServer.ps1 -Delete -VmName <name>`
+4. Clean up the environment by running `./CreateServer.ps1 -DeleteSprintSignoff -VmName <name>`
 
 ### Powershell arguments
 
@@ -56,7 +56,8 @@ Optional Parameters:
 
 Switches:
 
-- `-Delete` - Deletes the VM and all associated resources.
+- `-Delete` - Deletes the VM and all associated resources. Also deletes all created profiles.
+- `-DeleteSprintSignoff` - Deletes the VM and all associated resources.
 - `-ProfilesOnly` - Only creates the profiles for Tunnel.
 - `-NoProxy` - Skip configuring the proxy.
 - `-Simple` - Skip configuring the proxy and advanced settings.

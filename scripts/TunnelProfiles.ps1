@@ -24,10 +24,9 @@ Function Login-Graph {
             Exit -1
         }
 
+        $JWT = ConvertTo-SecureString -AsPlainText $JWT -Force
+
         Connect-MgGraph -AccessToken $JWT | Out-Null
-        
-        # Switch to beta since most of our endpoints are there
-        Select-MgProfile -Name "beta"
     }
 }
 #endregion Graph Functions
@@ -35,21 +34,21 @@ Function Login-Graph {
 #region Tunnel Server Profiles
 Function New-TunnelConfiguration {
     Write-Header "Creating Server Configuration..."
-    $script:Context.ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$($Context.VmName)'" -Limit 1
+    $script:Context.ServerConfiguration = Get-MgBetaDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$($Context.VmName)'" -Limit 1
     if ($Context.ServerConfiguration) {
         Write-Host "Already found Server Configuration named '$($Context.VmName)'"
     }
     else {
-        $script:Context.ServerConfiguration = New-MgDeviceManagementMicrosoftTunnelConfiguration -DisplayName $Context.VmName -ListenPort $Context.ListenPort -DnsServers $Context.ProxyIP -Network $Context.Subnet -AdvancedSettings @() -DefaultDomainSuffix $Context.TunnelFQDN -RoleScopeTagIds @("0") -RouteExcludes $Context.ExcludeRoutes -RouteIncludes $Context.IncludeRoutes -SplitDns @()
+        $script:Context.ServerConfiguration = New-MgBetaDeviceManagementMicrosoftTunnelConfiguration -DisplayName $Context.VmName -ListenPort $Context.ListenPort -DnsServers $Context.ProxyIP -Network $Context.Subnet -AdvancedSettings @() -DefaultDomainSuffix $Context.TunnelFQDN -RoleScopeTagIds @("0") -RouteExcludes $Context.ExcludeRoutes -RouteIncludes $Context.IncludeRoutes -SplitDns @()
     }
 }
 
 Function Remove-TunnelConfiguration {
     Write-Header "Deleting Server Configuration..."
-    $Context.ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$($Context.VmName)'" -Limit 1
+    $Context.ServerConfiguration = Get-MgBetaDeviceManagementMicrosoftTunnelConfiguration -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Context.ServerConfiguration) {
-        Remove-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
+        Remove-MgBetaDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
     }
     else {
         Write-Host "Server Configuration '$($Context.VmName)' does not exist."
@@ -58,13 +57,13 @@ Function Remove-TunnelConfiguration {
 
 Function New-TunnelSite {
     Write-Header "Creating Site..."
-    $Context.TunnelSite = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
+    $Context.TunnelSite = Get-MgBetaDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Context.TunnelSite) {
         Write-Host "Already found Site named '$($Context.VmName)'"
     }
     else {
-        $Context.TunnelSite = New-MgDeviceManagementMicrosoftTunnelSite -DisplayName $Context.VmName -PublicAddress $Context.TunnelFQDN -MicrosoftTunnelConfiguration @{id = $Context.ServerConfiguration.id } -RoleScopeTagIds @("0") -UpgradeAutomatically
+        $Context.TunnelSite = New-MgBetaDeviceManagementMicrosoftTunnelSite -DisplayName $Context.VmName -PublicAddress $Context.TunnelFQDN -MicrosoftTunnelConfiguration @{id = $Context.ServerConfiguration.id } -RoleScopeTagIds @("0") -UpgradeAutomatically
     }
 
     $script:Context.TunnelSite = $Context.TunnelSite
@@ -72,10 +71,10 @@ Function New-TunnelSite {
 
 Function Remove-TunnelSite {
     Write-Header "Deleting Site..."
-    $Context.TunnelSite = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
+    $Context.TunnelSite = Get-MgBetaDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Context.TunnelSite) {
-        Remove-MgDeviceManagementMicrosoftTunnelSite -MicrosoftTunnelSiteId $Context.TunnelSite.Id
+        Remove-MgBetaDeviceManagementMicrosoftTunnelSite -MicrosoftTunnelSiteId $Context.TunnelSite.Id
     }
     else {
         Write-Host "Site '$($Context.VmName)' does not exist."
@@ -84,10 +83,10 @@ Function Remove-TunnelSite {
 
 Function Remove-TunnelServers {
     Write-Header "Deleting Servers..."
-    $Context.TunnelSite = Get-MgDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
+    $Context.TunnelSite = Get-MgBetaDeviceManagementMicrosoftTunnelSite -Filter "displayName eq '$($Context.VmName)'" -Limit 1
 
     if ($Context.TunnelSite) {
-        $servers = Get-MgDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Context.TunnelSite.Id
+        $servers = Get-MgBetaDeviceManagementMicrosoftTunnelSiteMicrosoftTunnelServer -MicrosoftTunnelSiteId $Context.TunnelSite.Id
 
         $servers | ForEach-Object {
             Write-Header "Deleting '$($_.DisplayName)'..."
@@ -102,8 +101,8 @@ Function Remove-TunnelServers {
 Function Update-PrivateDNSAddress {
     Write-Header "Updating server configuration private DNS..."
 
-    Update-MgDeviceManagementMicrosoftTunnelConfiguration -DnsServers $Context.ProxyIP -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
-    $script:Context.ServerConfiguration = Get-MgDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
+    Update-MgBetaDeviceManagementMicrosoftTunnelConfiguration -DnsServers $Context.ProxyIP -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
+    $script:Context.ServerConfiguration = Get-MgBetaDeviceManagementMicrosoftTunnelConfiguration -MicrosoftTunnelConfigurationId $Context.ServerConfiguration.Id
 }
 #endregion Tunnel Server Profiles
 
@@ -250,13 +249,13 @@ Function New-IosAppProtectionPolicy {
         [string] $DisplayName
     )
 
-    $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    $IosAppProtectionPolicy = Get-MgBetaDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($IosAppProtectionPolicy) {
         Write-Host "Already found App Protection policy named '$DisplayName'"
     }
     else {
         Write-Header "Creating App Protection policy '$DisplayName'..."
-        $IosAppProtectionPolicy = New-MgDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
+        $IosAppProtectionPolicy = New-MgBetaDeviceAppManagementiOSManagedAppProtection -DisplayName $DisplayName
         Write-Header "Targeting bundles to '$DisplayName'..."
         $targetedApps = $Context.BundleIds | ForEach-Object { 
             @{
@@ -301,7 +300,7 @@ Function New-IosTrustedRootPolicy {
         [string] $DisplayName
     )
 
-    $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $IosTrustedRootPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if ($IosTrustedRootPolicy) {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
@@ -323,7 +322,7 @@ Function New-IosTrustedRootPolicy {
         $IosTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
 
         # re-fetch the policy so the root certificate is included
-        $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+        $IosTrustedRootPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
         
         $Body = @{
             "assignments" = @(@{
@@ -347,7 +346,7 @@ Function New-IosDeviceConfigurationPolicy {
         [string] $DisplayName
     )
 
-    $IosDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $IosDeviceConfigurationPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if ($IosDeviceConfigurationPolicy) {
         Write-Host "Already found Device Configuration policy named '$DisplayName'"
@@ -405,7 +404,7 @@ Function New-IosAppConfigurationPolicy {
         $TrustedRootPolicy
     )
 
-    $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1 | ConvertFrom-Json
+    $IosAppConfigurationPolicy = Get-MgBetaDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1 | ConvertFrom-Json
     if ($IosAppConfigurationPolicy) {
         Write-Host "Already found App Configuration policy named '$DisplayName'"
     }
@@ -496,7 +495,7 @@ Function New-IosAppConfigurationPolicy {
         } | ConvertTo-Json -Depth 10 -Compress
 
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
-        $IosAppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
+        $IosAppConfigurationPolicy = Get-MgBetaDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
     }
     
     return $IosAppConfigurationPolicy
@@ -509,7 +508,7 @@ Function New-AndroidTrustedRootPolicy {
         [string] $DisplayName
     )
 
-    $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $AndroidTrustedRootPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if ($AndroidTrustedRootPolicy) {
         Write-Host "Already found Trusted Root policy named '$DisplayName'"
@@ -531,7 +530,7 @@ Function New-AndroidTrustedRootPolicy {
         $AndroidTrustedRootPolicy = Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceManagement/deviceConfigurations" -Body $Body
 
         # re-fetch the policy so the root certificate is included
-        $AndroidTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+        $AndroidTrustedRootPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
         $Body = @{
             "assignments" = @(@{
@@ -553,7 +552,7 @@ Function New-AndroidDeviceConfigurationPolicy {
         [string] $DisplayName
     )
 
-    $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $AndroidDeviceConfigurationPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if ($AndroidDeviceConfigurationPolicy) {
         Write-Host "Already found Device Configuration policy named '$DisplayName'"
@@ -609,7 +608,7 @@ Function New-AndroidAppProtectionPolicy {
         [string] $DisplayName
     )
 
-    $AndroidAppProtectionPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'"
+    $AndroidAppProtectionPolicy = Get-MgBetaDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'"
     if ($AndroidAppProtectionPolicy) {
         Write-Host "Already found App Protection policy named '$DisplayName'"
     }
@@ -688,7 +687,7 @@ Function New-AndroidAppConfigurationPolicy {
         $TrustedRootPolicy
     )
 
-    $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    $AndroidAppConfigurationPolicy = Get-MgBetaDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($AndroidAppConfigurationPolicy) {
         Write-Host "Already found App Configuration policy named '$DisplayName'"
     }
@@ -816,7 +815,7 @@ Function New-AndroidAppConfigurationPolicy {
         } | ConvertTo-Json -Depth 10 -Compress
 
         Invoke-MgGraphRequest -Method POST -Uri "https://graph.microsoft.com/beta/deviceAppManagement/targetedManagedAppConfigurations" -Body $Body | Out-Null
-        $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
+        $AndroidAppConfigurationPolicy = Get-MgBetaDeviceAppManagementTargetedManagedAppConfiguration -Filter "displayName eq '$DisplayName'" -Limit 1
     }
 
     return $AndroidAppConfigurationPolicy
@@ -830,9 +829,9 @@ Function Remove-IosAppProtectionPolicy {
     )
     
     Write-Header "Deleting App Protection Policy '$DisplayName'..."
-    $IosAppProtectionPolicy = Get-MgDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    $IosAppProtectionPolicy = Get-MgBetaDeviceAppManagementiOSManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     if ($IosAppProtectionPolicy) {
-        Remove-MgDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $IosAppProtectionPolicy.Id
+        Remove-MgBetaDeviceAppManagementiOSManagedAppProtection -IosManagedAppProtectionId $IosAppProtectionPolicy.Id
     }
     else {
         Write-Host "App Protection Policy '$DisplayName' does not exist."
@@ -846,10 +845,10 @@ Function Remove-IosTrustedRootPolicy {
 
     Write-Header "Deleting Trusted Root Policy '$DisplayName'..."
 
-    $IosTrustedRootPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $IosTrustedRootPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if ($IosTrustedRootPolicy) {
-        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosTrustedRootPolicy.Id
+        Remove-MgBetaDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosTrustedRootPolicy.Id
     }
     else {
         Write-Host "Trusted Root Policy '$DisplayName' does not exist."
@@ -863,10 +862,10 @@ Function Remove-IosDeviceConfigurationPolicy {
 
     Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
 
-    $IosDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $IosDeviceConfigurationPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
 
     if ($IosDeviceConfigurationPolicy) {
-        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosDeviceConfigurationPolicy.Id
+        Remove-MgBetaDeviceManagementDeviceConfiguration -DeviceConfigurationId $IosDeviceConfigurationPolicy.Id
     }
     else {
         Write-Host "Device Configuration Policy '$DisplayName' does not exist."
@@ -880,10 +879,10 @@ Function Remove-IosAppConfigurationPolicy {
     
     Write-Header "Deleting App Configuration Policy '$DisplayName'..."
     
-    $IosAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    $IosAppConfigurationPolicy = Get-MgBetaDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     
     if ($IosAppConfigurationPolicy) {
-        Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $IosAppConfigurationPolicy.Id
+        Remove-MgBetaDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $IosAppConfigurationPolicy.Id
     }
     else {
         Write-Host "App Configuration Policy '$DisplayName' does not exist."
@@ -897,10 +896,10 @@ Function Remove-AndroidTrustedRootPolicy {
 
     Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
     
-    $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $AndroidDeviceConfigurationPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
     
     if ($AndroidDeviceConfigurationPolicy) {
-        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
+        Remove-MgBetaDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
     }
     else {
         Write-Host "Device Configuration Policy '$DisplayName' does not exist."
@@ -914,10 +913,10 @@ Function Remove-AndroidDeviceConfigurationPolicy {
     
     Write-Header "Deleting Device Configuration Policy '$DisplayName'..."
     
-    $AndroidDeviceConfigurationPolicy = Get-MgDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
+    $AndroidDeviceConfigurationPolicy = Get-MgBetaDeviceManagementDeviceConfiguration -Filter "displayName eq '$DisplayName'"
     
     if ($AndroidDeviceConfigurationPolicy) {
-        Remove-MgDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
+        Remove-MgBetaDeviceManagementDeviceConfiguration -DeviceConfigurationId $AndroidDeviceConfigurationPolicy.Id
     }
     else {
         Write-Host "Device Configuration Policy '$DisplayName' does not exist."
@@ -931,10 +930,10 @@ Function Remove-AndroidAppProtectionPolicy {
     
     Write-Header "Deleting App Protection Policy '$DisplayName'..."
     
-    $AndroidAppProtectionPolicy = Get-MgDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
+    $AndroidAppProtectionPolicy = Get-MgBetaDeviceAppManagementAndroidManagedAppProtection -Filter "displayName eq '$DisplayName'" -Limit 1
     
     if ($AndroidAppProtectionPolicy) {
-        Remove-MgDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $AndroidAppProtectionPolicy.Id
+        Remove-MgBetaDeviceAppManagementAndroidManagedAppProtection -AndroidManagedAppProtectionId $AndroidAppProtectionPolicy.Id
     }
     else {
         Write-Host "App Protection Policy '$DisplayName' does not exist."
@@ -948,10 +947,10 @@ Function Remove-AndroidAppConfigurationPolicy {
     
     Write-Header "Deleting App Configuration Policy '$DisplayName'..."
     
-    $AndroidAppConfigurationPolicy = Get-MgDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
+    $AndroidAppConfigurationPolicy = Get-MgBetaDeviceAppManagementManagedAppPolicy -Filter "displayName eq '$DisplayName'" -Limit 1
     
     if ($AndroidAppConfigurationPolicy) {
-        Remove-MgDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $AndroidAppConfigurationPolicy.Id
+        Remove-MgBetaDeviceAppManagementManagedAppPolicy -ManagedAppPolicyId $AndroidAppConfigurationPolicy.Id
     }
     else {
         Write-Host "App Configuration Policy '$DisplayName' does not exist."

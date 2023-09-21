@@ -48,6 +48,7 @@ Class TunnelContext {
     [string] $VnetName
     [string] $SubnetName
     [string] $ProxyIP
+    [object[]] $SupportedEndpoints = @()
     [pscredential[]] $AuthenticatedProxyCredentials = @()
     [Object] $ServerConfiguration
     [Object] $TunnelSite
@@ -63,6 +64,20 @@ Class Constants {
     static [string[]] $DefaultBypassUrls = @("www.google.com", "excluded", "excluded.$($Context.TunnelFQDN)")
 }
 
+Function Set-Endpoints() {
+    $script:Context.SupportedEndpoints = @(
+        @{label= "RequireCert"; url= "https://cert.$($Context.DomainName)"},
+        @{label= "OptionalCert"; url= "https://optionalcert.$($Context.DomainName)"},
+        @{label= "FetchCert"; url= "https://$($Context.DomainName)/user.pfx"},
+        @{label= "Webapp"; url= "https://webapp.$($Context.DomainName)"},
+        @{label= "Excluded"; url= "https://excluded.$($Context.DomainName)"},
+        @{label= "WebappShort"; url= "https://webapp"},
+        @{label= "Untrusted"; url= "https://untrusted.$($Context.DomainName)"},
+        @{label= "IPAddressAPI"; url= "https://webapp.$($Context.DomainName)/api/IPAddress"},
+        @{label= "ExcludedIPAPI"; url= "https://excluded.$($Context.DomainName)/api/IPAddress"},
+        @{label= "Context"; url= "http://$($Context.VmName)-server.$($Context.Location).cloudapp.azure.com/context.json"},
+        @{label= "ContextInternal"; url= "https://$($Context.DomainName)/context.json"})
+}
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
 }
