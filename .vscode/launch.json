@@ -6,16 +6,35 @@
     "configurations": [
         {
             "type": "PowerShell",
-            "request": "attach",
-            "name": "PowerShell Attach to Host Process",
-            "processId": "${command:PickPSHostProcess}",
-            "runspaceId": 1
+            "request": "launch",
+            "name": "Create TunnelTestEnv",
+            "script": "${file}",
+            "args": ["-SubscriptionId <mySubscriptionId> -VmName <myVMName> -GroupName <myGroupName>"],
+            "cwd": "${workspaceRoot}"
         },
         {
             "type": "PowerShell",
             "request": "launch",
-            "name": "PowerShell Interactive Session",
+            "name": "Delete TunnelTestEnv",
+            "script": "${file}",
+            "args": ["-Delete -SubscriptionId <mySubscriptionId> -VmName <myVMName>"],
             "cwd": "${workspaceRoot}"
-        }
+        },
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "Create Signoff TunnelTestEnv",
+            "script": ".\\CreateServer.ps1",
+            "args": ["-SprintSignoff -SubscriptionId <mySubscriptionId> -Image RedHat:RHEL:9-LVM:latest-BootDiagnostics -VmName <myVMName>"],
+            "cwd": "${workspaceRoot}"
+        },
+        {
+            "type": "PowerShell",
+            "request": "launch",
+            "name": "Delete Signoff TunnelTestEnv",
+            "script": ".\\CreateServer.ps1",
+            "args": ["-Delete -SubscriptionId <mySubscriptionId> -SprintSignoff -VmName <myVMName>"],
+            "cwd": "${workspaceRoot}"
+        },
     ]
 }

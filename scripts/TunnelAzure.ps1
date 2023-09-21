@@ -1,13 +1,11 @@
 #region Azure Functions
 Function Login-Azure {
     param(
-        [string] $SubscriptionId = "",
         [PSCredential] $VmTenantCredential = $null
     )
     
     if ($VmTenantCredential) {
         az login -u $VmTenantCredential.Username -p $VmTenantCredential.GetNetworkCredential().Password --only-show-errors | Out-Null
-        return
     }
 
     $accounts = az account show --only-show-errors | ConvertFrom-Json
@@ -17,145 +15,113 @@ Function Login-Azure {
 
         az login --only-show-errors | Out-Null
         
-        if (!$SubscriptionId) {
+        if (!$Context.SubscriptionId) {
             $accounts = (az account list | ConvertFrom-Json)
             if ($accounts.Count -gt 1) {
                 foreach ($account in $accounts) {
                     Write-Host "$($account.name) - $($account.id)"
                 }
-                $SubscriptionId = Read-Host "Please specify a subscription id: "
-            } else {
-                $SubscriptionId = $accounts[0].id
+                $script:Context.SubscriptionId = Read-Host "Please specify a subscription id: "
+            }
+            else {
+                $script:Context.SubscriptionId = $accounts[0].id
             }
         }
 
-        Write-Header "Setting subscription to $SubscriptionId"
-        az account set --subscription $SubscriptionId | Out-Null
-    } elseif ($accounts[0].id -ne $SubscriptionId) {
+        Write-Header "Setting subscription to $($Context.SubscriptionId)"
+        az account set --subscription $Context.SubscriptionId | Out-Null
+    }
+    elseif ($Context.SubscriptionId -And $accounts[0].id -ne $Context.SubscriptionId) {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
-        Write-Warning "If you don't want to use this account, please logout, then run this script again."
-        Write-Header "Setting subscription to $SubscriptionId"
-        az account set --subscription $SubscriptionId | Out-Null
-    } else {
+        Write-Warning "If you don't want to use this account, please run 'az logout', then run this script again."
+        Write-Header "Setting subscription to $($Context.SubscriptionId)"
+        az account set --subscription $Context.SubscriptionId | Out-Null
+    }
+    else {
         Write-Warning "Already logged into Azure CLI as $($accounts[0].user.name)"
         Write-Warning "Using subscription $($accounts[0].id)"
-        Write-Warning "If you don't want to use this account, please logout, then run this script again."
+        Write-Warning "If you don't want to use this account, please run 'az logout', then run this script again."
     }
 }
 Function New-ResourceGroup {
-    param(
-        [string] $resourceGroup,
-        [string] $location = "westus"
-    )
-
-    Write-Header "Checking for resource group '$resourceGroup'..."
-    if ([bool](az group show --name $resourceGroup 2> $null)) {
-        Write-Error "Group '$resourceGroup' already exists"
+    Write-Header "Checking for resource group '$($Context.ResourceGroup)'..."
+    if ([bool](az group show --name $Context.ResourceGroup 2> $null)) {
+        Write-Error "Group '$($Context.ResourceGroup)' already exists"
         exit -1
     }
     
-    Write-Header "Creating resource group '$resourceGroup'..."
-    return az group create --location $location --name $resourceGroup --only-show-errors | ConvertFrom-Json
+    Write-Header "Creating resource group '$($Context.ResourceGroup)'..."
+    az group create --location $Context.Location --name $Context.ResourceGroup --only-show-errors | Out-Null
 }
 
 Function Remove-ResourceGroup {
-    param(
-        [string] $resourceGroup
-    )
-    Write-Header "Checking for resource group '$resourceGroup'..."
-    if ([bool](az group show --name $resourceGroup 2> $null)) {
-        Write-Header "Deleting resource group '$resourceGroup'..."
-        az group delete --name $resourceGroup --yes --no-wait
+    Write-Header "Checking for resource group '$($Context.ResourceGroup)'..."
+    if ([bool](az group show --name $Context.ResourceGroup 2> $null)) {
+        Write-Header "Deleting resource group '$($Context.ResourceGroup)'..."
+        az group delete --name $Context.ResourceGroup --yes --no-wait
     }
     else {
-        Write-Host "Group '$resourceGroup' does not exist"
+        Write-Host "Group '$Context.ResourceGroup' does not exist"
     }
 }
 
-Function New-TunnelVM {
-    param(
-        [string] $VmName,
-        [string] $Username = "azureuser",
-        [string] $Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
-        [string] $Size = "Standard_B2s",
-        [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
-        [string] $location = "westus",
-        [string] $resourceGroup = "$VmName-group"
-    )
-    
-    Write-Header "Creating VM '$VmName'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name $VmName --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name $VmName --admin-username $Username --only-show-errors | ConvertFrom-Json
+Function New-Network {
+    $NsgName = "$($Context.VmName)-VNET-NSG"
+    $script:Context.VnetName = "$($Context.VmName)-VNET"
+    $script:Context.SubnetName = "$($Context.VmName)-Subnet"
 
-    Write-Host "DNS is '$($vmdata.fqdns)'"
-    return $vmdata
+    Write-Header "Creating network $($Context.VnetName)..."
+
+    az network nsg create --name $NsgName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+    az network nsg rule create --nsg-name $NsgName --name "AllowSSHIN" --priority 1000 --resource-group $Context.ResourceGroup --access Allow --destination-port-ranges 22 --protocol Tcp --direction Inbound --only-show-errors | Out-Null
+    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" --only-show-errors | Out-Null
+
+    az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+    az network vnet subnet create --network-security-group $NsgName --vnet-name $Context.VnetName --name "$($Context.SubnetName)" --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+}
+
+Function New-TunnelVM {    
+    Write-Header "Creating VM '$($Context.VmName)'..."
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
+
+    if ($Context.BootDiagnostics) {
+        Write-Header "Enabling boot diagnostics..."
+        az vm boot-diagnostics enable --resource-group $Context.ResourceGroup --name $Context.VmName
+    }
 }
 
 Function New-NetworkRules {
-    param(
-        [string] $resourceGroup,
-        [string] $VmName,
-        [bool] $WithSSHOpen = $false
-    )
     Write-Header "Creating network rules..."
     
-    if ($WithSSHOpen) {
-        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
+    if ($Context.WithSSHOpen) {
+        az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)NSG" -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
     }
     
-    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
+    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)NSG" -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
 }
 
 Function New-AdvancedNetworkRules {
-    param(
-        [string] $resourceGroup,
-        [string] $ProxyIP,
-        [string] $VmName,
-        [bool] $WithSSHOpen = $false
-    )
-
     Write-Header "Creating network rules..."
 
-    if ($WithSSHOpen) {
-        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowSSHIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-        # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowRDPIn" --priority 104 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
+    if ($Context.WithSSHOpen) {
+        az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)NSG" -n "AllowSSHIn" --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
     }
 
-    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowHTTPSIn" --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
-    # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "AllowOutboundProxy" --priority 102 --source-address-prefixes "$ProxyIP" --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --access Allow --protocol '*' --description "Allow Proxy Outbound Traffic" > $null
-    # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)NSG" -n "DenyOutboundNoProxy" --priority 103 --source-address-prefixes '10.0.0.0/8' --source-port-ranges '*' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --access Deny --protocol '*' --description "Deny All Outbound Traffic" > $null
+    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)NSG" -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
 
-    if ($WithSSHOpen) {
-        az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowSSHIn" --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-        # az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowRDPIn" --priority 104 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 3389 --access Allow --protocol Tcp --description "Allow RDP" > $null
+    if ($Context.WithSSHOpen) {
+        az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)-serverNSG" -n "AllowSSHIn" --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
     }
 
-    az network nsg rule create --resource-group $resourceGroup --nsg-name "$($VmName)-serverNSG" -n "AllowHTTPSIn" --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
+    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)-serverNSG" -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
 }
 
-Function New-ServiceVM {
-    param(
-        [string] $VmName,
-        [string] $Username = "azureuser",
-        [string] $Image = "Canonical:0001-com-ubuntu-server-focal:20_04-lts:latest",
-        [string] $Size = "Standard_B2s",
-        [string] $SSHKeyPath = "$HOME/.ssh/$VmName",
-        [string] $location = "westus",
-        [string] $resourceGroup = "$VmName-group"
-    )
-    
-    Write-Header "Creating VM '$VmName-server'..."
-    $vmdata = az vm create --location $location --resource-group $resourceGroup --name "$VmName-server" --image $Image --size $Size --ssh-key-values "$SSHKeyPath.pub" --public-ip-address-dns-name "$VmName-server" --admin-username $Username --only-show-errors | ConvertFrom-Json
-
-    Write-Host "DNS is '$($vmdata.fqdns)'"
-    return $vmdata
+Function New-ServiceVM {    
+    Write-Header "Creating VM '$($Context.VmName)-server'..."
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name "$($Context.VmName)-server" --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
 }
 
 Function Update-RebootVM {
-    param(
-        [string] $VmName,
-        [string] $resourceGroup = "$VmName-group"
-    )
-
-    az vm restart --resource-group $resourceGroup --name $VmName
+    az vm restart --resource-group $Context.ResourceGroup --name $Context.VmName
 }
 #endregion Azure Functions
