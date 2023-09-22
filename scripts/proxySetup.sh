@@ -89,7 +89,7 @@ InstallInspectionProxy() {
         exit 1
     fi
     
-    /usr/lib/squid/security_file_certgen -c -s /etc/squid/ssl_db -M 10
+    /usr/lib/squid/security_file_certgen -c -s /etc/squid/ssl_db -M 2048
 
     LogInfo "Prerequisites installed."
 }
