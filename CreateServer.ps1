@@ -404,16 +404,17 @@ Function New-TunnelEnvironment {
         New-NetworkRules
     }
 
+    # Create Certificates
+    New-BasicPki
+    # Setup DNS
+    New-DnsServer
+
     if (!$Context.NoProxy) {
         # Setup Proxy server on Service VM
         Initialize-Proxy
         Invoke-ProxyScript
     }
 
-    # Create Certificates
-    New-BasicPki
-    # Setup DNS
-    New-DnsServer
     # Setup WebServers
     Set-Endpoints
     Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
@@ -469,16 +470,17 @@ Function New-SprintSignoffEnvironment {
         New-NetworkRules
     }
 
+    # Create Certificates
+    New-BasicPki
+    # Setup DNS
+    New-DnsServer
+
     if (!$Context.NoProxy) {
         # Setup Proxy server on Service VM
         Initialize-Proxy
         Invoke-ProxyScript
     }
 
-    # Create Certificates
-    New-BasicPki
-    # Setup DNS
-    New-DnsServer
     # Setup WebServers
     Set-Endpoints
     Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
