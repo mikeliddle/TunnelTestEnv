@@ -440,6 +440,8 @@ Function New-TunnelEnvironment {
 
     New-Profiles
 
+    Remove-SSHRule
+
     New-Summary
     
     if (!$StayLoggedIn) {
@@ -487,6 +489,8 @@ Function New-SprintSignoffEnvironment {
     New-NginxSetup
 
     Update-RebootVM
+
+    Remove-SSHRule
 
     New-Summary
 
