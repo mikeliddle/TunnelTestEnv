@@ -73,11 +73,13 @@ Function Set-Endpoints() {
         @{label= "Webapp"; url= "https://webapp.$($Context.TunnelFQDN)"},
         @{label= "Excluded"; url= "https://excluded.$($Context.TunnelFQDN)"},
         @{label= "WebappShort"; url= "https://webapp"},
+
         @{label= "Untrusted"; url= "https://untrusted.$($Context.TunnelFQDN)"},
         @{label= "IPAddressAPI"; url= "https://webapp.$($Context.TunnelFQDN)/api/IPAddress"},
         @{label= "ExcludedIPAPI"; url= "https://excluded.$($Context.TunnelFQDN)/api/IPAddress"},
         @{label= "Context"; url= "http://$($Context.VmName)-server.$($Context.Location).cloudapp.azure.com/context.json"},
-        @{label= "ContextInternal"; url= "https://$($Context.TunnelFQDN)/context.json"})
+        @{label= "ContextInternal"; url= "https://$($Context.TunnelFQDN)/context.json"},
+        @{label= "PACFile"; url= "https://$($Context.TunnelFQDN)/tunnel.pac"})
 }
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan

@@ -17,7 +17,6 @@ Usage() {
     echo "Example: $0"
     echo "Options:"
     echo "  -a: use an authenticated proxy"
-    echo "  -b: setup TLS inspection on the proxy"
     echo "  -u: uninstall proxy"
     echo "  -h: Show this help message"
     exit 1
@@ -28,50 +27,10 @@ InstallPrereqs() {
     maxRetries=3
     sudo apt-get -y update >> install.log 2>&1
 
-    for command in "sudo apt-get install -y squid" "sudo apt-get install -y apache2-utils";
-    do
-        LogInfo "Preparing command '$command'..."
-        retryCount=0
-        installSucceeded=1
-        while [ $installSucceeded -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
-            LogInfo "Running command '$command'..."
-            $command >> install.log 2>&1
-            
-            if [ $? -ne 0 ]; then
-                LogWarning "Failed to install prerequisites, retrying..."
-                installSucceeded=1
-                retryCount=$((retryCount+1))
-                sleep 5
-            else
-                LogInfo "Succeeded in running command '$command'"
-                installSucceeded=0
-                break
-            fi
-        done
-
-        if [ $installSucceeded -ne 0 ]; then
-            LogError "Failed to install prerequisites after $maxRetries attempts."
-            exit 1
-        fi
-    done
-
-    LogInfo "Prerequisites installed."
-}
-
-InstallInspectionProxy() {
-    LogInfo "Installing..."
-    maxRetries=3
-    retryCount=0
-    installSucceeded=1
-
-    mkdir -p /etc/apt/keyrings
-    wget -q https://packages.diladele.com/diladele_pub.asc 
-    cp diladele_pub.asc /etc/apt/keyrings/diladele_pub.asc
-    echo "deb [signed-by=/etc/apt/keyrings/diladele_pub.asc] https://squid57.diladele.com/ubuntu/ focal main" > /etc/apt/sources.list.d/squid57.diladele.com.list
     apt update >> install.log 2>&1
 
     while [ $installSucceeded -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
-        apt install -y squid-common squid-openssl squidclient libecap3 libecap3-dev >> install.log 2>&1
+        apt install -y docker.io >> install.log 2>&1
 
         if [ $? -ne 0 ]; then
             LogError "Failed to install prerequisites."
@@ -83,13 +42,6 @@ InstallInspectionProxy() {
             break
         fi
     done
-
-    if [ $installSucceeded -ne 0 ]; then
-        LogError "Failed to install prerequisites after $maxRetries attempts."
-        exit 1
-    fi
-    
-    /usr/lib/squid/security_file_certgen -c -s /etc/squid/ssl_db -M 2048
 
     LogInfo "Prerequisites installed."
 }
@@ -104,7 +56,7 @@ PrepareBasicAuthentication() {
     done < ./passwords
     rm ./passwords
     mv ./hashedpasswords ./passwords
-    cp ./passwords /etc/squid/passwords
+    docker cp ./passwords proxy:/etc/squid/passwords
     LogInfo "Prepared Basic Authentication..."
 }
 
@@ -115,32 +67,40 @@ Uninstall() {
 }
 
 ConfigureSquid() {
-    cp ./squid.conf /etc/squid/squid.conf
-    cp ./allowlist /etc/squid/allowlist
-    cp ./ssl_error_domains /etc/squid/ssl_error_domains
-    cp ./ssl_exclude_domains /etc/squid/ssl_exclude_domains
-    cp ./ssl_exclude_ips /etc/squid/ssl_exclude_ips
+    docker cp ./squid.conf proxy:/etc/squid/squid.conf
+    docker cp ./allowlist proxy:/etc/squid/allowlist
+    docker cp ./ssl_error_domains proxy:/etc/squid/ssl_error_domains
+    docker cp ./ssl_exclude_domains proxy:/etc/squid/ssl_exclude_domains
+    docker cp ./ssl_exclude_ips proxy:/etc/squid/ssl_exclude_ips
     
+    docker restart proxy >> squid.log 2>&1
+
     if [ $? -ne 0 ]; then
         LogError "Failed to configure Squid."
         exit 1
     fi
-
-    sudo systemctl restart squid
     LogInfo "Squid configured."
 }
 
-while getopts "abu" opt; do
+StartSquid() {
+    LogInfo "Setting up Squid proxy container"
+    docker volume create squid-vol > squid.log
+
+    docker run -d \
+        -p 3128:3128 \
+        --mount type=volume,source=squid-vol,dst=/etc/squid \
+        --name=proxy \
+        --restart=unless-stopped \
+        mliddle2/tunnelproxy >> squid.log 2>&1
+}
+
+while getopts "au" opt; do
     case $opt in
         a)
             LogInfo "Configuring with basic authentication."
             InstallPrereqs
+            StartSquid
             PrepareBasicAuthentication
-            ConfigureSquid
-            exit 0
-            ;;
-        b)
-            InstallInspectionProxy
             ConfigureSquid
             exit 0
             ;;
@@ -160,4 +120,5 @@ while getopts "abu" opt; do
 done
 
 InstallPrereqs
+StartSquid
 ConfigureSquid
