@@ -202,14 +202,16 @@ Function Test-Prerequisites {
         Exit 1
     }
     
+    $graphVersion = "2.6.1"
     if (-Not $SprintSignoff) {
         if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph.Beta")) {
             Write-Header "Installing Microsoft.Graph..."
-            Install-Module Microsoft.Graph -Force -MinimumVersion 2.6.1
-            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion 2.6.1
+            Install-Module Microsoft.Graph -Force -MinimumVersion $graphVersion
+            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion $graphVersion
         }
 
-        Import-Module Microsoft.Graph.Beta -MinimumVersion 2.6.1
+        Write-Host "Importing Microsoft.Graph.Beta..."
+        Import-Module Microsoft.Graph.Beta.DeviceManagement -MinimumVersion $graphVersion
     }
 
     if (-Not ($PSVersionTable.PSVersion.Major -ge 6)) {
@@ -241,6 +243,7 @@ Function Logout {
 Function Initialize {
     $script:Context = [TunnelContext]::new()
     $script:Context.SubscriptionId = $SubscriptionId
+    $script:Context.TunnelTestEnvCommit = (git show --oneline -s)
 
     if ($CreateFromContext) {
         $script:Context = Get-Content -Path "context.json" | ConvertFrom-Json

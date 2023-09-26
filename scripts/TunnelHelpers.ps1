@@ -57,6 +57,7 @@ Class TunnelContext {
     [string[]] $IncludeRoutes = @()
     [string[]] $ExcludeRoutes = @()
     [bool] $BootDiagnostics = $false
+    [string] $TunnelTestEnvCommit
 }
 
 Class Constants {
@@ -66,17 +67,17 @@ Class Constants {
 
 Function Set-Endpoints() {
     $script:Context.SupportedEndpoints = @(
-        @{label= "RequireCert"; url= "https://cert.$($Context.DomainName)"},
-        @{label= "OptionalCert"; url= "https://optionalcert.$($Context.DomainName)"},
-        @{label= "FetchCert"; url= "https://$($Context.DomainName)/user.pfx"},
-        @{label= "Webapp"; url= "https://webapp.$($Context.DomainName)"},
-        @{label= "Excluded"; url= "https://excluded.$($Context.DomainName)"},
+        @{label= "RequireCert"; url= "https://cert.$($Context.TunnelFQDN)"},
+        @{label= "OptionalCert"; url= "https://optionalcert.$($Context.TunnelFQDN)"},
+        @{label= "FetchCert"; url= "https://$($Context.TunnelFQDN)/user.pfx"},
+        @{label= "Webapp"; url= "https://webapp.$($Context.TunnelFQDN)"},
+        @{label= "Excluded"; url= "https://excluded.$($Context.TunnelFQDN)"},
         @{label= "WebappShort"; url= "https://webapp"},
-        @{label= "Untrusted"; url= "https://untrusted.$($Context.DomainName)"},
-        @{label= "IPAddressAPI"; url= "https://webapp.$($Context.DomainName)/api/IPAddress"},
-        @{label= "ExcludedIPAPI"; url= "https://excluded.$($Context.DomainName)/api/IPAddress"},
+        @{label= "Untrusted"; url= "https://untrusted.$($Context.TunnelFQDN)"},
+        @{label= "IPAddressAPI"; url= "https://webapp.$($Context.TunnelFQDN)/api/IPAddress"},
+        @{label= "ExcludedIPAPI"; url= "https://excluded.$($Context.TunnelFQDN)/api/IPAddress"},
         @{label= "Context"; url= "http://$($Context.VmName)-server.$($Context.Location).cloudapp.azure.com/context.json"},
-        @{label= "ContextInternal"; url= "https://$($Context.DomainName)/context.json"})
+        @{label= "ContextInternal"; url= "https://$($Context.TunnelFQDN)/context.json"})
 }
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan
