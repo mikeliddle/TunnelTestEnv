@@ -150,7 +150,7 @@ CreateUserCert() {
     openssl req -new -key private/user.key -out req/user.csr -config user.conf >> certs.log 2>&1
     openssl x509 -req -days 365 -in req/user.csr -CA certs/intermediate.pem -CAkey private/intermediatekey.pem \
         -CAcreateserial -out certs/user.pem -extensions req_ext -extfile user.conf >> certs.log 2>&1
-    openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass: >> certs.log 2>&1
+    openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass:password -legacy >> certs.log 2>&1
 
     chmod 766 private/user.pfx
 
