@@ -152,6 +152,8 @@ CreateUserCert() {
         -CAcreateserial -out certs/user.pem -extensions req_ext -extfile user.conf >> certs.log 2>&1
     openssl pkcs12 -export -out private/user.pfx -inkey private/user.key -in certs/user.pem -passout pass: >> certs.log 2>&1
 
+    chmod 766 private/user.pfx
+
     if [ $? -ne 0 ]; then
         LogError "Failed to setup User cert"
         cd $current_dir

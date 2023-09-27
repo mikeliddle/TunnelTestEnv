@@ -67,17 +67,18 @@ Class Constants {
 
 Function Set-Endpoints() {
     $script:Context.SupportedEndpoints = @(
-        @{label= "RequireCert"; url= "https://cert.$($Context.TunnelFQDN)"},
-        @{label= "OptionalCert"; url= "https://optionalcert.$($Context.TunnelFQDN)"},
-        @{label= "FetchCert"; url= "https://$($Context.TunnelFQDN)/user.pfx"},
+        @{label= "Require Cert"; url= "https://cert.$($Context.TunnelFQDN)"},
+        @{label= "Optional Cert"; url= "https://optionalcert.$($Context.TunnelFQDN)"},
+        @{label= "Fetch Cert"; url= "https://$($Context.TunnelFQDN)/user.pfx"},
         @{label= "Webapp"; url= "https://webapp.$($Context.TunnelFQDN)"},
-        @{label= "Excluded"; url= "https://excluded.$($Context.TunnelFQDN)"},
-        @{label= "WebappShort"; url= "https://webapp"},
+        @{label= "Excluded By PAC"; url= "https://excluded.$($Context.TunnelFQDN)"},
+        @{label= "Webapp Short"; url= "https://webapp"},
+        @{label= "Excluded Short"; url= "https://excluded"},
         @{label= "Untrusted"; url= "https://untrusted.$($Context.TunnelFQDN)"},
-        @{label= "IPAddressAPI"; url= "https://webapp.$($Context.TunnelFQDN)/api/IPAddress"},
-        @{label= "ExcludedIPAPI"; url= "https://excluded.$($Context.TunnelFQDN)/api/IPAddress"},
-        @{label= "Context"; url= "http://$($Context.VmName)-server.$($Context.Location).cloudapp.azure.com/context.json"},
-        @{label= "ContextInternal"; url= "https://$($Context.TunnelFQDN)/context.json"})
+        @{label= "PAC Included IP API"; url= "https://webapp.$($Context.TunnelFQDN)/api/IPAddress"},
+        @{label= "PAC Excluded IP API"; url= "https://excluded.$($Context.TunnelFQDN)/api/IPAddress"},
+        @{label= "Context"; url= "https://$($Context.TunnelFQDN)/context.json"},
+        @{label= "PAC File"; url= "https://$($Context.TunnelFQDN)/tunnel.pac"})
 }
 Function Write-Header([string]$Message) {
     Write-Host $Message -ForegroundColor Cyan

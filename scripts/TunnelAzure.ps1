@@ -73,11 +73,26 @@ Function New-Network {
     Write-Header "Creating network $($Context.VnetName)..."
 
     az network nsg create --name $NsgName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
-    az network nsg rule create --nsg-name $NsgName --name "AllowSSHIN" --priority 1000 --resource-group $Context.ResourceGroup --access Allow --destination-port-ranges 22 --protocol Tcp --direction Inbound --only-show-errors | Out-Null
-    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" --only-show-errors | Out-Null
+    $LocalIP = Invoke-WebRequest https://api.ipify.org
+
+    $LocalIP = $LocalIP.Content
+    $LocalIP = $LocalIP.Split(".") | Select -Index 0,1
+    $LocalIP = $LocalIP | Join-String -Separator "."
+    $LocalIP = "$LocalIP.0.0/16"
+    
+    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName --name "AllowSSHIN" --priority 1000  --source-address-prefixes "$LocalIP" --source-port-ranges '*' --destination-port-ranges 22 --access Allow --protocol Tcp --direction Inbound --only-show-errors | Out-Null
+    
+    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName --name "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" --only-show-errors | Out-Null
 
     az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
     az network vnet subnet create --network-security-group $NsgName --vnet-name $Context.VnetName --name "$($Context.SubnetName)" --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+}
+
+Function Remove-SSHRule {
+    if (!$Context.WithSSHOpen) {
+        Write-Header "Removing SSH rule..."
+        az network nsg rule delete --resource-group $Context.ResourceGroup --nsg-name "$($script:Context.VnetName)-NSG" -n "AllowSSHIN" --only-show-errors | Out-Null
+    }
 }
 
 Function New-TunnelVM {    
