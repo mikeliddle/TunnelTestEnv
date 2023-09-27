@@ -98,9 +98,6 @@ Function Invoke-ProxyScript {
     Write-Header "Connecting into remote server..."
 
     $flags = ""
-    if ($Context.UseInspection) {
-        $flags += " -b"
-    }
     if ($Context.AuthenticatedProxyCredentials) {
         $flags += " -a"
     }

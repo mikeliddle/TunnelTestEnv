@@ -25,6 +25,8 @@ Usage() {
 InstallPrereqs() {
     LogInfo "Installing prerequisites..."
     maxRetries=3
+    retryCount=0
+    installSucceeded=1
     sudo apt-get -y update >> install.log 2>&1
 
     apt update >> install.log 2>&1
