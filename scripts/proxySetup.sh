@@ -74,6 +74,8 @@ ConfigureSquid() {
     docker cp ./ssl_error_domains proxy:/etc/squid/ssl_error_domains
     docker cp ./ssl_exclude_domains proxy:/etc/squid/ssl_exclude_domains
     docker cp ./ssl_exclude_ips proxy:/etc/squid/ssl_exclude_ips
+    docker cp /etc/pki/tls/certs proxy:/etc/squid/certs
+    docker cp /etc/pki/tls/private proxy:/etc/squid/private
     
     docker restart proxy >> squid.log 2>&1
 

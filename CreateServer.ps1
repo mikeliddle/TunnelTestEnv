@@ -206,8 +206,8 @@ Function Test-Prerequisites {
     if (-Not $SprintSignoff) {
         if (-Not (Get-Module -ListAvailable -Name "Microsoft.Graph.Beta")) {
             Write-Header "Installing Microsoft.Graph..."
-            Install-Module Microsoft.Graph -Force -MinimumVersion $graphVersion
-            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion $graphVersion
+            Install-Module Microsoft.Graph -Force -MinimumVersion $graphVersion -AllowClobber
+            Install-Module Microsoft.Graph.Beta -Force -MinimumVersion $graphVersion -AllowClobber
         }
 
         Write-Host "Importing Microsoft.Graph.Beta..."
