@@ -50,7 +50,7 @@ Function Initialize-Proxy {
         $proxyScript = Join-Path $pwd -ChildPath "scripts" -AdditionalChildPath "proxySetup.sh"
         $pacFile = Join-Path $pwd -ChildPath "nginx_data" -AdditionalChildPath "tunnel.pac"
 
-        (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$($Context.TunnelFQDN)" -replace "##BASIC_AUTH##", "$basicAuthConfig" -replace "##BREAK_AND_INSPECT##", "$breakAndInspectConfig" -replace "##ALLOWLIST##", "$allowlistConfig" | out-file "$configFile.tmp"
+        (Get-Content $configFile) -replace "##DOMAIN_NAME##", "$($Context.TunnelFQDN)" -replace "##BASIC_AUTH##", "$basicAuthConfig" -replace "##BREAK_AND_INSPECT##", "$breakAndInspectConfig" -replace "##ALLOWLIST##", "$allowlistConfig" -replace "##DNS_IP##", "$($Context.ProxyIP)" | out-file "$configFile.tmp"
         (Get-Content $allowlistFile) -replace "##DOMAIN_NAME##", "$($Context.TunnelFQDN)" | out-file "$allowlistFile.tmp"
 
         $ProxyURL = "proxy.$($Context.TunnelFQDN)"
