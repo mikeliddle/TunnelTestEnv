@@ -382,120 +382,123 @@ Function New-Profiles {
 #region Main Functions
 Function New-TunnelEnvironment {
     Login
-    if (!$CreateFromContext) {
-        Initialize-Variables
-    }
+    try {
+        if (!$CreateFromContext) {
+            Initialize-Variables
+        }
 
-    New-SSHKeys
+        New-SSHKeys
 
-    New-ServicePrincipal
+        New-ServicePrincipal
 
-    New-ResourceGroup
-    New-Network
-    New-TunnelVM
-    New-ServiceVM
-    
-    $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
+        New-ResourceGroup
+        New-Network
+        New-TunnelVM
+        New-ServiceVM
+        
+        $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
 
-    if (-Not $Simple) {
-        New-AdvancedNetworkRules
-    }
-    else {
-        New-NetworkRules
-    }
+        if (-Not $Simple) {
+            New-AdvancedNetworkRules
+        }
+        else {
+            New-NetworkRules
+        }
 
-    # Create Certificates
-    New-BasicPki
-    # Setup DNS
-    New-DnsServer
+        # Create Certificates
+        New-BasicPki
+        # Setup DNS
+        New-DnsServer
 
-    if (!$Context.NoProxy) {
-        # Setup Proxy server on Service VM
-        Initialize-Proxy
-        Invoke-ProxyScript
-    }
+        if (!$Context.NoProxy) {
+            # Setup Proxy server on Service VM
+            Initialize-Proxy
+            Invoke-ProxyScript
+        }
 
-    # Setup WebServers
-    Set-Endpoints
-    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
-    New-NginxSetup
+        # Setup WebServers
+        Set-Endpoints
+        Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
+        New-NginxSetup
 
-    Update-RebootVM
+        Update-RebootVM
 
-    # Create Tunnel Configuration
-    New-TunnelConfiguration
-    New-TunnelSite
+        # Create Tunnel Configuration
+        New-TunnelConfiguration
+        New-TunnelSite
 
-    # Enroll Tunnel Agent
-    New-TunnelAgent -TenantCredential $TenantCredential
+        # Enroll Tunnel Agent
+        New-TunnelAgent -TenantCredential $TenantCredential
 
-    Initialize-TunnelServer
-    Initialize-SetupScript
-    Invoke-SetupScript
+        Initialize-TunnelServer
+        Initialize-SetupScript
+        Invoke-SetupScript
 
-    Update-PrivateDNSAddress
+        Update-PrivateDNSAddress
 
-    $AppRegistration = Update-ADApplication
-    New-GeneratedXCConfig -AppId $AppRegistration.AppId
+        $AppRegistration = Update-ADApplication
+        New-GeneratedXCConfig -AppId $AppRegistration.AppId
 
-    New-Profiles
+        New-Profiles
 
-    Remove-SSHRule
-
-    New-Summary
-    
-    if (!$StayLoggedIn) {
-        Logout
+        New-Summary
+    } finally {
+        Remove-SSHRule
+        if (!$StayLoggedIn) {
+            Logout
+        }
     }
 }
 
 Function New-SprintSignoffEnvironment {
     Login-Azure -VmTenantCredential $VmTenantCredential
 
-    if (!$CreateFromContext) {
-        Initialize-Variables
-    }
+    try {
+        if (!$CreateFromContext) {
+            Initialize-Variables
+        }
 
-    New-SSHKeys
+        New-SSHKeys
 
-    New-ResourceGroup
-    New-Network
-    New-TunnelVM
-    New-ServiceVM
+        New-ResourceGroup
+        New-Network
+        New-TunnelVM
+        New-ServiceVM
 
-    $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
+        $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
 
-    if (-Not $Simple) {
-        New-AdvancedNetworkRules
-    }
-    else {
-        New-NetworkRules
-    }
+        if (-Not $Simple) {
+            New-AdvancedNetworkRules
+        }
+        else {
+            New-NetworkRules
+        }
 
-    # Create Certificates
-    New-BasicPki
-    # Setup DNS
-    New-DnsServer
+        # Create Certificates
+        New-BasicPki
+        # Setup DNS
+        New-DnsServer
 
-    if (!$Context.NoProxy) {
-        # Setup Proxy server on Service VM
-        Initialize-Proxy
-        Invoke-ProxyScript
-    }
+        if (!$Context.NoProxy) {
+            # Setup Proxy server on Service VM
+            Initialize-Proxy
+            Invoke-ProxyScript
+        }
 
-    # Setup WebServers
-    Set-Endpoints
-    Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
-    New-NginxSetup
+        # Setup WebServers
+        Set-Endpoints
+        Set-Content -Path "context.json" -Value (ConvertTo-Json $Context) -Force
+        New-NginxSetup
 
-    Update-RebootVM
+        Update-RebootVM
 
-    Remove-SSHRule
-
-    New-Summary
-
-    if (!$StayLoggedIn) {
-        az logout
+        New-Summary
+    } finally {
+        Remove-SSHRule
+        
+        if (!$StayLoggedIn) {
+            az logout
+        }
     }
 }
 
