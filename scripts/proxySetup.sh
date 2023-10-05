@@ -30,9 +30,8 @@ InstallPrereqs() {
 
     while [ $installSucceeded -ne 0 ] && [ $retryCount -lt $maxRetries ]; do 
     
-    apt-get -y update \
-    && apt-get -y install apache2-utils \
-    && apt -y install docker.io >> install.log 2>&1
+    apt -y update \
+    && apt -y install apache2-utils docker.io >> install.log 2>&1
 
         if [ $? -ne 0 ]; then
             LogError "Failed to install prerequisites."

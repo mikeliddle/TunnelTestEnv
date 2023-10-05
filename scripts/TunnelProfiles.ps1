@@ -415,6 +415,10 @@ Function New-IosAppConfigurationPolicy {
                 name  = "com.microsoft.intune.mam.managedbrowser.TunnelAvailable.IntuneMAMOnly"
                 value = "true"
             }
+            @{  # Edge setting for a custom new tab page
+                name = "com.microsoft.intune.mam.managedbrowser.NewTabPage.CustomURL"
+                value = "https://webapp"
+            }
             @{
                 name  = "com.microsoft.tunnel.connection_type"
                 value = "MicrosoftProtect"
