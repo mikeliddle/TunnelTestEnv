@@ -79,13 +79,35 @@ Function New-Network {
     $LocalIP = $LocalIP.Split(".") | Select -Index 0,1
     $LocalIP = $LocalIP | Join-String -Separator "."
     $LocalIP = "$LocalIP.0.0/16"
+
+    $addressPrefixes = [System.Collections.ArrayList]@()
+    $addressPrefixes.Add("10.0.0.0/16") | Out-Null
+    if ($Context.WithIPv6) {
+        # Reserve some IPv6 addresses with a prefix, then allocate two of them, one for the tunnel VM and one for the service VM.
+        $prefixName = "$($Context.VmName)prefix"
+        $prefixLength = 126 # We'll reserve 4 IP addresses in the prefix.
+        Write-Header "Creating IPv6 prefix $prefixName..."
+        $prefix = az network public-ip prefix create --length $prefixLength --name $prefixName --resource-group $Context.ResourceGroup --version IPv6 | ConvertFrom-Json
+        $ipv6Prefix = Get-IPv6Prefix $prefix.ipPrefix 64  # When we create the subnet, Azure requires a /64 length.
+        $addressPrefixes.Add($ipv6Prefix) | Out-Null
+        
+        Write-Header "Creating IPv6 adresses..."
+        $ipAddressName = "$($Context.VmName)ipv6"
+        $publicIP = az network public-ip create --name $ipAddressName --resource-group $Context.ResourceGroup --allocation-method Static --public-ip-prefix $prefixName --version IPv6 | ConvertFrom-Json
+        $script:Context.TunnelIPv6Name = $publicIP.publicIp.name
+        $script:Context.TunnelIPv6Address = $publicIP.publicIp.ipAddress
+        $ipAddressName = "$($Context.VmName)serviceipv6"
+        $publicIP = az network public-ip create --name $ipAddressName --resource-group $Context.ResourceGroup --allocation-method Static --public-ip-prefix $prefixName --version IPv6 | ConvertFrom-Json
+        $script:Context.TunnelServiceIPv6Name = $publicIP.publicIp.name
+        $script:Context.TunnelServiceIPv6Address = $publicIP.publicIp.ipAddress
+    }
     
     az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName --name "AllowSSHIN" --priority 1000  --source-address-prefixes "$LocalIP" --source-port-ranges '*' --destination-port-ranges 22 --access Allow --protocol Tcp --direction Inbound --only-show-errors | Out-Null
     
     az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $NsgName --name "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" --only-show-errors | Out-Null
 
-    az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
-    az network vnet subnet create --network-security-group $NsgName --vnet-name $Context.VnetName --name "$($Context.SubnetName)" --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+    az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --address-prefixes $addressPrefixes --only-show-errors | Out-Null
+    az network vnet subnet create --network-security-group $NsgName --vnet-name $Context.VnetName --name "$($Context.SubnetName)" --address-prefixes $addressPrefixes --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
 }
 
 Function Remove-SSHRule {

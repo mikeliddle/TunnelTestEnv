@@ -58,6 +58,11 @@ Class TunnelContext {
     [string[]] $ExcludeRoutes = @()
     [bool] $BootDiagnostics = $false
     [string] $TunnelTestEnvCommit
+    [bool] $WithIPv6 = $false
+    [string] $TunnelIPv6Name
+    [string] $TunnelIPv6Address
+    [string] $TunnelServiceIPv6Name
+    [string] $TunnelServiceIPv6Address
 }
 
 Class Constants {
@@ -171,4 +176,30 @@ Function New-RandomPassword {
 
     # Output the password
     return $password
+}
+
+# Give me an IPv6 address, like 2a01:111:f100:3000::a83e:1938/256 and a prefix length, like 64, and I return a valid prefix, like 2a01:111:f100:3000::/64.
+# This implementation uses simple string manipulation and won't handle all IP addresses, such as those where :: in the prefix is short for :0000:0000:.
+# prefixLength must be a multiple of 16.
+# You could probably make it more robust by using the .Net IPAddress type.
+Function Get-IPv6Prefix {
+    param(
+        [string] $address,
+        [Int32] $prefixLength
+    )
+
+    if ($address.Contains("/")) {
+        # Trim any trailing prefix length, like "/126".
+        $address = $address.Substring(0, $address.IndexOf("/"))
+    }
+
+    $address = $address.Replace("::", ":0:")    # Will break for addresses with multiple adjacent 0 quartets. This is unlikely for Azure addresses. 
+
+    $quartets = $address.Split(":")
+    $numQuartets = ($prefixLength / 16)     # Sixteen bits per quartet.
+
+    $prefix = $quartets[0..($numQuartets - 1)] -join ":"
+    $prefix += "::/" + $prefixLength
+
+    return $prefix
 }
