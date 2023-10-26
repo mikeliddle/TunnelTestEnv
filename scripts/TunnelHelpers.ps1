@@ -68,6 +68,7 @@ Class TunnelContext {
 Class Constants {
     static [string] $CertFileName = "cacert.pem.tmp"
     static [string[]] $DefaultBypassUrls = @("www.google.com", "excluded", "excluded.$($Context.TunnelFQDN)")
+    static [string] $ServerVMImage = "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest"
 }
 
 Function Set-Endpoints() {
