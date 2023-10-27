@@ -160,6 +160,11 @@ param(
     [Parameter(Mandatory = $false, ParameterSetName = "ProfilesOnly")]
     [string[]]$ExcludeRoutes = @(),
 
+    [Parameter(Mandatory = $false, ParameterSetName = "Create")]
+    [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
+    [Parameter(Mandatory = $false, ParameterSetName = "SprintSignoff")]
+    [switch]$WithIPv6,
+
     [Parameter(Mandatory = $false, ParameterSetName = "ADFS")]
     [switch]$WithADFS,
 
@@ -270,7 +275,7 @@ Function Initialize {
         $script:Context.Image = "OpenLogic:CentOS:7_9:latest"
     }
     else {
-        $script:Context.Image = "Canonical:0001-com-ubuntu-server-jammy:22_04-lts:latest"
+        $script:Context.Image = $Image
     }
     
     if ($NoPki) {
@@ -319,6 +324,7 @@ Function Initialize-Variables {
     $script:Context.NoPACUrl = $NoPACUrl
     $script:Context.UseInspection = $UseInspection
     $script:Context.UseAllowList = $UseAllowList
+    $script:Context.WithIPv6 = $WithIPv6
 
     $script:Context.Account = (az account show | ConvertFrom-Json)
     $script:Context.Subscription = $Context.Account.id
@@ -552,6 +558,10 @@ Function New-Summary {
             Write-Success $Allowlist
             Write-Success ""
         }
+    }
+    if ($Context.WithIPv6) {
+        Write-Success "Tunnel Server IPv6 address: $($Context.TunnelIPv6Address)"
+        Write-Success "Service Server IPv6 address: $($Context.TunnelServiceIPv6Address)"
     }
 
     Write-Success "DNS Server: $($Context.ProxyIP)"

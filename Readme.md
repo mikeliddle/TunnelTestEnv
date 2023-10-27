@@ -66,13 +66,14 @@ Switches:
 - `-StayLoggedIn` - Stay logged in to the accounts after the script finishes.
 - `-UseInspection` - Configures proxy to use TLS inspection (Break and Inspect).
 - `-UseAllowList` - Configures proxy to use an allow list.
-- `-SprintSignoff` - Setups the services on a VM, and sets up a linux VM ready for tunnel installation, but doesn't create profiles or install Tunnel.
+- `-SprintSignoff` - Sets up the services on a VM, and sets up a linux VM ready for tunnel installation, but doesn't create profiles or install Tunnel.
 - `-NoPACUrl` - Doesn't configure a PAC file when used with ProfilesOnly.
 - `-WithADFS` - Configure ADFS in the environment. This is a WIP and is not fully functional yet.
 - `-RHEL8` - Uses the RHEL 8 lvm image for the Tunnel VM.
 - `-RHEL7` - Uses the RHEL 7 lvm image for the Tunnel VM.
 - `-Centos7` - Uses the Centos 7.9 image from OpenLogic for the Tunnel VM.
 - `-BootDiagnostics` - Turn on boot diagnostics on the Tunnel VM.
+- `-WithIPv6` - Create IPv6 address for the VMs, in addition to the IPv4 addresses.
 
 ## Environment explanation
 The test environment will consist of the following components:

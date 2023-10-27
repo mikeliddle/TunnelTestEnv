@@ -66,6 +66,15 @@ CopyAndPrintCertificate() {
     cat ./letsencrypt.pem
 }
 
+OpenPort443()
+{
+    # Red Hat distros typically have a software firewall with port 443 closed. This command opens it.
+    # Ubuntu systems don't usually have firewall-cmd installed, so this command does nothing on Ubuntu.
+    if type firewall-cmd &> /dev/null; then
+        firewall-cmd --zone=public --add-port=443/tcp > /dev/null 2>&1
+    fi
+}
+
 while getopts ":e:d:" opt; do
     case $opt in
         d)
@@ -100,5 +109,6 @@ if [ -z "$DOMAIN_NAME" ]; then
 fi
 
 SetupPrereqs
+OpenPort443
 SetupAcmesh
 CopyAndPrintCertificate
