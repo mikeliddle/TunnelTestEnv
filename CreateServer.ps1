@@ -570,6 +570,7 @@ Function New-Summary {
     Write-Success "Internal Endpoints: "
     Write-Success "  http://$($Context.ProxyIP) - most stable for reachability check"
     Write-Success "  https://webapp or https://webapp.$($Context.TunnelFQDN) - When using a proxy, this should show your IP as $($Context.ProxyIP)"
+    Write-Success "  https://fuzz or https://fuzz.$($Context.TunnelFQDN) - Used to fuzz test the http headers"
     Write-Success "  https://excluded or https://excluded.$($Context.TunnelFQDN) - When using a proxy, this should show you a different IP than above"
     Write-Success "  https://$($Context.TunnelFQDN) - This endpoint is secured using LetsEncrypt when accessed through the VPN."
     Write-Success "  https://cert or https://cert.$($Context.TunnelFQDN) - This endpoint requires a client certificate"

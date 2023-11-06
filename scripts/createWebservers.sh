@@ -113,6 +113,8 @@ SetupWebApps() {
         --restart=unless-stopped \
         -p 8081:80 \
         -p 8443:443 \
+        -p 3080:3080 \
+        -p 3443:3443 \
         -e PROXY_IP=$PROXY_IP \
         -e ASPNETCORE_URLS="https://+;http://+" \
         -e ASPNETCORE_HTTPS_PORT=443 \
@@ -124,6 +126,8 @@ SetupWebApps() {
     WEBSERVICE_IP=$($ctr_cli container inspect -f "{{ .NetworkSettings.Networks.$network_name.IPAddress }}" webapp)
     sed -i "s/##WEBSERVICE_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
     sed -i "s/##EXCLUDED_IP##/${WEBSERVICE_IP}/g" *.d/*.conf
+
+    $ctr_cli cp fuzzing/fuzzing.js webapp:/fuzzing.js
 
     WEBSERVICE_HEALTH=$($ctr_cli container inspect -f "{{ .State.Status }}" webapp)
     if [ "$WEBSERVICE_HEALTH" != "running" ]; then
