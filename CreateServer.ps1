@@ -560,8 +560,8 @@ Function New-Summary {
         }
     }
     if ($Context.WithIPv6) {
-        Write-Success "Tunnel Server IPv6 address: $($Context.TunnelIPv6Address)"
-        Write-Success "Service Server IPv6 address: $($Context.TunnelServiceIPv6Address)"
+        Write-Success "Tunnel Server IPv6 address: $($script:Context.TunnelGatewayIPv6Address).ipAddress"
+        Write-Success "Service Server IPv6 address: $($script:Context.TunnelGatewayIPv6Address).ipAddress"
     }
 
     Write-Success "DNS Server: $($Context.ProxyIP)"

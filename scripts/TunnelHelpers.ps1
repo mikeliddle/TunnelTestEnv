@@ -59,10 +59,9 @@ Class TunnelContext {
     [bool] $BootDiagnostics = $false
     [string] $TunnelTestEnvCommit
     [bool] $WithIPv6 = $false
-    [string] $TunnelIPv6Name
-    [string] $TunnelIPv6Address
-    [string] $TunnelServiceIPv6Name
-    [string] $TunnelServiceIPv6Address
+    [Object] $TunnelGatewayIPv6Address
+    [Object] $TunnelServiceIPv6Address
+    [string] $NicName
 }
 
 Class Constants {
@@ -179,28 +178,89 @@ Function New-RandomPassword {
     return $password
 }
 
-# Give me an IPv6 address, like 2a01:111:f100:3000::a83e:1938/256 and a prefix length, like 64, and I return a valid prefix, like 2a01:111:f100:3000::/64.
-# This implementation uses simple string manipulation and won't handle all IP addresses, such as those where :: in the prefix is short for :0000:0000:.
-# prefixLength must be a multiple of 16.
-# You could probably make it more robust by using the .Net IPAddress type.
-Function Get-IPv6Prefix {
-    param(
-        [string] $address,
-        [Int32] $prefixLength
+# Give me an IPv6 address, like 2a01:111:f100:3000::a83e:1938 and a prefix length, like 64, and I return a valid prefix string, like "2a01:111:f100:3000::/64".
+function Get-IPv6Prefix {
+    param (
+        [string]$IPv6Address,
+        [int]$NumPrefixBits
     )
 
-    if ($address.Contains("/")) {
-        # Trim any trailing prefix length, like "/126".
-        $address = $address.Substring(0, $address.IndexOf("/"))
+    $IPv6AddressBytes = [System.Net.IPAddress]::Parse($IPv6Address).GetAddressBytes()
+    $IPv6AddressBits = [System.BitConverter]::ToString($IPv6AddressBytes).Replace('-','')
+    $leftBits = $IPv6AddressBits.Substring(0, 16)
+    $leftBits = [System.Convert]::ToUInt64($leftBits, 16)
+    $rightBits = $IPv6AddressBits.Substring(16, 16)
+    $rightBits = [System.Convert]::ToUInt32($rightBits, 16)
+
+    # Create a bitmask for the left bits.
+    $mask = ""
+    $numLeftOneBits = [Math]::Min(64, $NumPrefixBits)
+    for ($i = 0; $i -lt $numLeftOneBits; $i++) {
+        $mask = $mask + "1"
+    }
+    $numLeftZeroBits = [Math]::Min(64 - $numLeftOneBits, 64)
+    for ($i = 0; $i -lt $numLeftZeroBits; $i++) {
+        $mask = $mask + "0"
+    }   
+    [UInt64]$leftBitmask = [System.Convert]::ToUInt64($mask, 2)
+    $maskedLeftAddress = $leftBits -band $leftBitmask
+
+    # Create a bitmask for the right bits.
+    $mask = ""
+    $numRightOneBits = [Math]::Max(0, $NumPrefixBits - 64)
+    for ($i = 0; $i -lt $numRightOneBits; $i++) {
+        $mask = $mask + "1"
+    }
+    $numRightZeroBits = [Math]::Min(64 - $numRightOneBits, 64)
+    for ($i = 0; $i -lt $numRightZeroBits; $i++) {
+        $mask = $mask + "0"
+    }   
+    [UInt64]$rightBitmask = [System.Convert]::ToUInt64($mask, 2)
+    $maskedRightAddress = $rightBits -band $rightBitmask
+
+    # Convert the two 64-bit numbers into a byte array with the bytes in the right order.
+    $prefixBytes =  New-Object Byte[] 16
+    $leftBytes = [System.BitConverter]::GetBytes($maskedLeftAddress) 
+    for ($i = 0; $i -lt 8; $i++) {
+        $prefixBytes[$i] = $leftBytes[8 - $i - 1]
+    }
+    $rightBytes = [System.BitConverter]::GetBytes($maskedRightAddress) 
+    for ($i = 0; $i -lt 8; $i++) {
+        $prefixBytes[$i + 8] = $rightBytes[8 -$i - 1]
     }
 
-    $address = $address.Replace("::", ":0:")    # Will break for addresses with multiple adjacent 0 quartets. This is unlikely for Azure addresses. 
+    # Create an IPv6 string address from #prefixBytes.
+    $hexString = [System.BitConverter]::ToString($prefixBytes) -replace "-", ""
+    $hexString = "{0}:{1}:{2}:{3}:{4}:{5}:{6}:{7}" -f $hexString.Substring(0, 4), $hexString.Substring(4, 4), $hexString.Substring(8, 4), $hexString.Substring(12, 4), $hexString.Substring(16, 4), $hexString.Substring(20, 4), $hexString.Substring(24, 4), $hexString.Substring(28, 4)
+    $ip = [System.Net.IPAddress]::Parse($hexString)
 
-    $quartets = $address.Split(":")
-    $numQuartets = ($prefixLength / 16)     # Sixteen bits per quartet.
+    $CIDRAddress = $ip.IPAddressToString
+    return $CIDRAddress.ToString() + '/' + $NumPrefixBits
+}
 
-    $prefix = $quartets[0..($numQuartets - 1)] -join ":"
-    $prefix += "::/" + $prefixLength
+# Give me an IPv4 address, like 20.253.142.17 and a prefix length, like 16, and I return a valid prefix string, like "20.253.0.0/16".
+function Get-IPv4Prefix {
+    param (
+        [string]$IPAddress,
+        [int]$NumPrefixBits
+    )
+    $IP = [System.Net.IPAddress]::Parse($IPAddress)
+    [UInt32]$address = $Ip.Address
+    $mask = ""
+    for ($i = 32; $i -gt $NumPrefixBits; $i--) {
+        $mask = $mask + "0"
+    }
+    for ($i = 0; $i -lt $NumPrefixBits; $i++) {
+        $mask = $mask + "1"
+    }   
+    [UInt32]$bitmask = [System.Convert]::ToUInt32($mask, 2)
+    [UInt32]$maskedAddress = $address -band $bitmask
 
-    return $prefix
+    $IPPrefix = [System.Net.IPAddress]::new($maskedAddress)
+
+    #$CIDRNotation = ([IPAddress]::Parse(([convert]::ToUInt32($binaryString, 2)).ToString())).ToString()
+    $CIDRNotation = $IPPrefix.ToString()
+    $CIDRNotation = $CIDRNotation + "/" + $NumPrefixBits
+
+    return $CIDRNotation
 }
