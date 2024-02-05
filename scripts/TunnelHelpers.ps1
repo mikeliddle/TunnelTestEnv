@@ -62,7 +62,8 @@ Class TunnelContext {
     [bool] $WithIPv6 = $false
     [Object] $TunnelGatewayIPv6Address
     [Object] $TunnelServiceIPv6Address
-    [string] $NicName
+    [string] $TunnelNicName
+    [string] $ServiceNicName
 }
 
 Class Constants {

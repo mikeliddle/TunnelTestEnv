@@ -66,9 +66,11 @@ Function Remove-ResourceGroup {
 }
 
 Function New-Network {
-    $script:Context.NSGName = "$($Context.VmName)-NSG"
-    $script:Context.VnetName = "$($Context.VmName)-VNET"
-    $script:Context.SubnetName = "$($Context.VmName)-Subnet"
+    $Context.NSGName = "$($Context.VmName)-VNET-NSG"
+    $Context.VnetName = "$($Context.VmName)-VNET"
+    $Context.SubnetName = "$($Context.VmName)-Subnet"
+    $Context.TunnelNicName = "$($Context.VmName)-NIC"
+    $publicIPv4Name = "PublicIPv4"
 
     Write-Header "Creating network $($Context.VnetName)..."
 
@@ -82,28 +84,39 @@ Function New-Network {
     az network nsg create --name $Context.NSGName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
     az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $Context.NSGName --name "AllowSSHIN" --priority 1000  --source-address-prefixes "$LocalIP" --source-port-ranges '*' --destination-port-ranges 22 --access Allow --protocol Tcp --direction Inbound --only-show-errors | Out-Null
     az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $Context.NSGName --name "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" --only-show-errors | Out-Null
+    az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv4Name --sku Standard --version IPv4 --dns-name $Context.VmName --only-show-errors | Out-Null 
 
     if (!$Context.WithIPv6) {
         # Create IPv4 network.
         az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
-        az network vnet subnet create --network-security-group $Context.NSGName --vnet-name $Context.VnetName --name "$($Context.SubnetName)" --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
+        az network vnet subnet create --network-security-group $Context.NSGName --vnet-name $Context.VnetName --name $Context.SubnetName --address-prefixes "10.0.0.0/24" --resource-group $Context.ResourceGroup --only-show-errors | Out-Null
 
-        # When Azure creates a NIC, it will be named <VMName>VMNic.
-        $script:Context.NicName = "$($Context.VmName)VMNic"
+        az network nic create --resource-group $Context.ResourceGroup --name $Context.TunnelNicName --vnet-name $Context.VnetName --subnet $Context.SubnetName --public-ip-address $publicIPv4Name --network-security-group $Context.NSGName | Out-Null 
     }
     else {
         # Create IPv6 network.
         # For now, hardcode the IPv6 prefix to 2404:f800:8000:122::.
-        $publicIPv4Name = "publicIPv4"
-        $publicIPv6Name = "publicIPv6"
+        az network vnet create --name $Context.VnetName --resource-group $Context.ResourceGroup --address-prefixes 10.0.0.0/16 2404:f800:8000:122::/63 --subnet-name $Context.SubnetName --subnet-prefixes 10.0.0.0/24 2404:f800:8000:122::/64 | Out-Null 
+
+        # Create a Network Interface Card (NIC) for the gateway server.
+        $publicIPv6Name = "PublicIPv6"
         $IPv6ConfigName = "IPv6Config"
-        $nicName = "$($Context.VmName)-NIC"
-        az network vnet create --resource-group $Context.ResourceGroup --name $Context.VnetName --address-prefixes 10.0.0.0/16 2404:f800:8000:122::/63 --subnet-name $Context.SubnetName --subnet-prefixes 10.0.0.0/24 2404:f800:8000:122::/64 | Out-Null 
-        az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv4Name --sku Standard --version IPv4 --dns-name $Context.VmName | Out-Null 
-        az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv6Name --sku Standard --version IPv6 | Out-Null
+        $Context.TunnelGatewayIPv6Address = az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv6Name --sku Standard --version IPv6 --dns-name "$($Context.VmName)ipv6" --only-show-errors | ConvertFrom-Json
+        $Context.TunnelGatewayIPv6Address = $Context.TunnelGatewayIPv6Address.publicIp
+        az network nic create --resource-group $Context.ResourceGroup --name $Context.TunnelNicName --vnet-name $Context.VnetName --subnet $Context.SubnetName --public-ip-address $publicIPv4Name --network-security-group $Context.NSGName | Out-Null 
+        az network nic ip-config create --resource-group $Context.ResourceGroup --name $IPv6ConfigName --nic-name $Context.TunnelNicName --private-ip-address-version IPv6 --vnet-name $Context.VnetName --subnet $Context.SubnetName --public-ip-address $publicIPv6Name | Out-Null  
+
+        # Create a Network Interface Card (NIC) for the container server.
+        $publicIPv4Name = "ServicePublicIPv4"
+        $publicIPv6Name = "ServicePublicIPv6"
+        $IPv6ConfigName = "ServiceIPv6Config"
+        $nicName = "$($Context.VmName)-NIC-Service"
+        az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv4Name --sku Standard --version IPv4 --dns-name "$($Context.VmName)-server" --only-show-errors | Out-Null 
+        $Context.TunnelServiceIPv6Address = az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv6Name --sku Standard --version IPv6 --dns-name "$($Context.VmName)ipv6-service" --only-show-errors | ConvertFrom-Json
+        $Context.TunnelServiceIPv6Address = $Context.TunnelServiceIPv6Address.publicIp
         az network nic create --resource-group $Context.ResourceGroup --name $nicName --vnet-name $Context.VnetName --subnet $Context.SubnetName --public-ip-address $publicIPv4Name --network-security-group $Context.NSGName | Out-Null 
         az network nic ip-config create --resource-group $Context.ResourceGroup --name $IPv6ConfigName --nic-name $nicName --private-ip-address-version IPv6 --vnet-name $Context.VnetName --subnet $Context.SubnetName --public-ip-address $publicIPv6Name | Out-Null  
-        $script:Context.NicName = $nicName
+        $script:Context.ServiceNicName = $nicName    
     }
 }
 
@@ -116,14 +129,7 @@ Function Remove-SSHRule {
 
 Function New-TunnelVM {    
     Write-Header "Creating VM '$($Context.VmName)'..."
-    if ($Context.WithIPv6) {
-        # Create a VM with our NIC.
-        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --only-show-errors --nics $Context.NicName | Out-Null
-    } 
-    else {
-        # Create a VM, and let Azure create a NIC.
-        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
-    }
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --nics $Context.TunnelNicName --only-show-errors | Out-Null
 
     if ($Context.BootDiagnostics) {
         Write-Header "Enabling boot diagnostics..."
@@ -131,35 +137,16 @@ Function New-TunnelVM {
     }
 }
 
-Function New-NetworkRules {
-    Write-Header "Creating network rules..."
-    
-    if ($Context.WithSSHOpen) {
-        az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $Context.NSGName -n SSHIN --priority 100 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-    }
-    
-    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $Context.NSGName -n HTTPIN --priority 101 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTP" > $null
-}
-
-Function New-AdvancedNetworkRules {
-    Write-Header "Creating network rules..."
-
-    if ($Context.WithSSHOpen) {
-        az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $Context.NSGName -n "AllowSSHIn" --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-    }
-
-    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name $Context.NSGName -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
-
-    if ($Context.WithSSHOpen) {
-        az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)-serverNSG" -n "AllowSSHIn" --priority 101 --source-address-prefixes '*' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 22 --access Allow --protocol Tcp --description "Allow SSH" > $null
-    }
-
-    az network nsg rule create --resource-group $Context.ResourceGroup --nsg-name "$($Context.VmName)-serverNSG" -n "AllowHTTPSIn" --priority 100 --source-address-prefixes 'Internet' --source-port-ranges '*' --destination-address-prefixes '*' --destination-port-ranges 443 --access Allow --protocol '*' --description "Allow HTTPS" > $null
-}
-
 Function New-ServiceVM {    
     Write-Header "Creating VM '$($Context.VmName)-server'..."
-    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name "$($Context.VmName)-server" --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
+    if ($Context.WithIPv6) {
+        # Create a VM with our NIC.
+        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --admin-username $Context.Username --only-show-errors --nics $Context.ServiceNicName | Out-Null
+    } 
+    else {
+        # Create a VM, and let Azure create a NIC.
+        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name "$($Context.VmName)-server" --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
+    }
 }
 
 Function Update-RebootVM {

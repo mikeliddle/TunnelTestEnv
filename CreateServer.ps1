@@ -404,13 +404,6 @@ Function New-TunnelEnvironment {
         
         $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
 
-        if (-Not $Simple) {
-            New-AdvancedNetworkRules
-        }
-        else {
-            New-NetworkRules
-        }
-
         # Create Certificates
         New-BasicPki
         # Setup DNS
@@ -472,13 +465,6 @@ Function New-SprintSignoffEnvironment {
         New-ServiceVM
 
         $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
-
-        if (-Not $Simple) {
-            New-AdvancedNetworkRules
-        }
-        else {
-            New-NetworkRules
-        }
 
         # Create Certificates
         New-BasicPki
@@ -560,8 +546,9 @@ Function New-Summary {
         }
     }
     if ($Context.WithIPv6) {
-        Write-Success "Tunnel Server IPv6 address: $($script:Context.TunnelGatewayIPv6Address).ipAddress"
-        Write-Success "Service Server IPv6 address: $($script:Context.TunnelGatewayIPv6Address).ipAddress"
+        Write-Success "Tunnel Server IPv6 address: $($script:Context.TunnelGatewayIPv6Address.ipAddress)"
+        Write-Success "Service Server IPv6 address: $($script:Context.TunnelServiceIPv6Address.ipAddress)"
+        Write-Success ""
     }
 
     Write-Success "DNS Server: $($Context.ProxyIP)"
