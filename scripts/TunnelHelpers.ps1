@@ -181,6 +181,7 @@ Function New-RandomPassword {
 }
 
 # Give me an IPv6 address, like 2a01:111:f100:3000::a83e:1938 and a prefix length, like 64, and I return a valid prefix string, like "2a01:111:f100:3000::/64".
+# This function isn't currently used, but it will be needed when we stop hardcoding the IPv6 address.
 function Get-IPv6Prefix {
     param (
         [string]$IPv6Address,
@@ -241,6 +242,7 @@ function Get-IPv6Prefix {
 }
 
 # Give me an IPv4 address, like 20.253.142.17 and a prefix length, like 16, and I return a valid prefix string, like "20.253.0.0/16".
+# This function isn't currently used, but it may be needed if we ever stop hardcoding the IPv4 private address.
 function Get-IPv4Prefix {
     param (
         [string]$IPAddress,

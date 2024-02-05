@@ -7,25 +7,9 @@
         {
             "type": "PowerShell",
             "request": "launch",
-            "name": "Create TunnelTestEnv",
-            "script": "${file}",
-            "args": ["-SubscriptionId <mySubscriptionId> -VmName <myVMName> -GroupName <myGroupName>"],
-            "cwd": "${workspaceRoot}"
-        },
-        {
-            "type": "PowerShell",
-            "request": "launch",
-            "name": "Delete TunnelTestEnv",
-            "script": "${file}",
-            "args": ["-Delete -SubscriptionId <mySubscriptionId> -VmName <myVMName>"],
-            "cwd": "${workspaceRoot}"
-        },
-        {
-            "type": "PowerShell",
-            "request": "launch",
             "name": "Create Signoff TunnelTestEnv",
             "script": ".\\CreateServer.ps1",
-            "args": ["-SprintSignoff -SubscriptionId <mySubscriptionId> -Image RedHat:RHEL:9-LVM:latest-BootDiagnostics -VmName <myVMName>"],
+            "args": ["-SprintSignoff -SubscriptionId 34f2279c-2de9-44d7-98c6-e0533cd70bd8 -Image RedHat:RHEL:9-lvm:9.2.2023062319 -BootDiagnostics -StayLoggedIn -WithIPv6 -VmName tunnelsignofftest2"],
             "cwd": "${workspaceRoot}"
         },
         {
@@ -33,7 +17,7 @@
             "request": "launch",
             "name": "Delete Signoff TunnelTestEnv",
             "script": ".\\CreateServer.ps1",
-            "args": ["-DeleteSprintSignoff -SubscriptionId <mySubscriptionId> -SprintSignoff -VmName <myVMName>"],
+            "args": ["-DeleteSprintSignoff -SubscriptionId 34f2279c-2de9-44d7-98c6-e0533cd70bd8 -SprintSignoff -StayLoggedIn -VmName tunnelsignofftest2"],
             "cwd": "${workspaceRoot}"
         },
     ]
