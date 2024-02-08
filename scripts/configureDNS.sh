@@ -16,11 +16,12 @@ Usage() {
     echo "Usage: $0 "
     echo "Example: $0 "
     echo "Options:"
-    echo "  none: setup unbound in a container"
-    echo "  -u: Update an existing A record"
-    echo "  -i: IP address to use for A record"
-    echo "  -d: Domain name to use for A record"
-    echo "  -h: Show this help message"
+    echo "  none: Set up Unbound in a container."
+    echo "  -c: Create a new DNS record."
+    echo "  -i: IP address to use for the DNS record."
+    echo "  -d: Domain name to use for the DNS record."
+    echo "  -q: Create an IPv6 quad-A record rather than an IPv4 A record."
+    echo "  -h: Show this help message."
     exit 1
 }
 
@@ -66,7 +67,11 @@ SetupPrereqs() {
 }
 
 AddARecord() {
-    template='# local-data: "##DOMAIN##. A ##IP##"'
+    if [ $QuadA ]; then
+        template='# local-data: "##DOMAIN##. AAAA ##IP##"'
+    else
+        template='# local-data: "##DOMAIN##. A ##IP##"'
+    fi
     ptr_template='# local-data-ptr: "##IP## ##DOMAIN##."'
 
     if [ -z "$DOMAIN_NAME" ]; then
@@ -90,7 +95,7 @@ AddARecord() {
     record="$record\n$template"
     ptr_record="$(echo $ptr_template | sed -e "s/##DOMAIN##/$DOMAIN_NAME/" -e "s/##IP##/$IP_ADDRESS/")"
     ptr_record="$(echo $ptr_record | sed -e "s/#//")"
-    prt_record="$ptr_record\n$ptr_template"
+    ptr_record="$ptr_record\n$ptr_template"
 
     sed -i "s/$template/$record/" a-records.conf
     sed -i "s/$ptr_template/$ptr_record/" a-records.conf
@@ -126,16 +131,19 @@ SetupUnbound() {
     fi
 }
 
-while getopts ":hud:i:" opt; do
+while getopts ":hcqd:i:" opt; do
     case $opt in
-        u)
-            Update=true
+        c)
+            Create=true
             ;;
         i)
             IP_ADDRESS=$OPTARG
             ;;
         d)
             DOMAIN_NAME=$OPTARG
+            ;;
+        q)
+            QuadA=true
             ;;
         h)
             Usage
@@ -150,7 +158,7 @@ done
 
 SetupPrereqs
 
-if [ $Update ]; then
+if [ $Create ]; then
     AddARecord
 else
     SetupUnbound

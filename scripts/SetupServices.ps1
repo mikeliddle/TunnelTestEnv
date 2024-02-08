@@ -50,13 +50,23 @@ Function New-DnsServer {
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" -r ./unbound.conf.d/unbound.conf "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
 
     ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "chmod +x ~/configureDNS.sh"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh"   # Configure the Unbound DNS container.
 
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d $($Context.TunnelFQDN)"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d proxy.$($Context.TunnelFQDN)"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d trusted.$($Context.TunnelFQDN)"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d untrusted.$($Context.TunnelFQDN)"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d webapp.$($Context.TunnelFQDN)"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d excluded.$($Context.TunnelFQDN)"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -u -i $($Context.ProxyIP) -d cert.$($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d $($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d proxy.$($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d trusted.$($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d untrusted.$($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d webapp.$($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d excluded.$($Context.TunnelFQDN)"
+    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -i $($Context.ProxyIP) -d cert.$($Context.TunnelFQDN)"
+
+    if ($Context.WithIPv6) {
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d $($Context.TunnelFQDNIpv6)"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d proxy.$($Context.TunnelFQDNIpv6)"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d trusted.$($Context.TunnelFQDNIpv6)"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d untrusted.$($Context.TunnelFQDNIpv6)"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d webapp.$($Context.TunnelFQDNIpv6)"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d excluded.$($Context.TunnelFQDNIpv6)"
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./configureDNS.sh -c -q -i $($Context.ProxyIPv6) -d cert.$($Context.TunnelFQDNIpv6)"
+    }
 }

@@ -8,6 +8,15 @@ Function Get-ProxyPrivateIP {
     return az vm list-ip-addresses --resource-group $Context.ResourceGroup --name $Context.ProxyVmName --query '[0].virtualMachine.network.privateIpAddresses[0]' | ConvertFrom-Json
 }
 
+Function Get-ProxyPrivateIPv6 {
+    if ($Context.WithIPv6) {
+        return az vm list-ip-addresses --resource-group $Context.ResourceGroup --name $Context.ProxyVmName --query '[0].virtualMachine.network.privateIpAddresses[1]' | ConvertFrom-Json
+    }
+    else {
+        return ""
+    }
+}
+
 Function Initialize-Proxy {
     try {
         $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"

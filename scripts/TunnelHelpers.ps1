@@ -45,10 +45,13 @@ Class TunnelContext {
     [Object] $Group
     [string] $ServiceFQDN
     [string] $TunnelFQDN
+    [string] $ServiceFQDNIpv6
+    [string] $TunnelFQDNIpv6
     [string] $VnetName
     [string] $SubnetName
     [string] $NSGName
     [string] $ProxyIP
+    [string] $ProxyIPv6
     [object[]] $SupportedEndpoints = @()
     [pscredential[]] $AuthenticatedProxyCredentials = @()
     [Object] $ServerConfiguration

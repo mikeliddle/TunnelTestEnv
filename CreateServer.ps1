@@ -344,7 +344,9 @@ Function Initialize-Variables {
 
     $script:Context.TunnelFQDN = "$VmName.$Location.cloudapp.azure.com"
     $script:Context.ServiceFQDN = "$VmName-server.$Location.cloudapp.azure.com"
-
+    $script:Context.TunnelFQDNIpv6 = "$($VmName)IPv6.$Location.cloudapp.azure.com"
+    $script:Context.ServiceFQDNIpv6 = "$($VmName)IPv6-server.$Location.cloudapp.azure.com"
+    
     if ($PACUrl -eq "") {
         $script:Context.PACUrl = "http://$($Context.TunnelFQDN)/tunnel.pac"
     }
@@ -403,6 +405,7 @@ Function New-TunnelEnvironment {
         New-ServiceVM
         
         $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
+        $script:Context.ProxyIPv6 = Get-ProxyPrivateIPv6 -VmName $ServiceVMName
 
         # Create Certificates
         New-BasicPki
@@ -465,6 +468,7 @@ Function New-SprintSignoffEnvironment {
         New-ServiceVM
 
         $script:Context.ProxyIP = Get-ProxyPrivateIP -VmName $ServiceVMName
+        $script:Context.ProxyIPv6 = Get-ProxyPrivateIPv6 -VmName $ServiceVMName
 
         # Create Certificates
         New-BasicPki
