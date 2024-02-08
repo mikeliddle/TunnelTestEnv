@@ -5,7 +5,12 @@ Function New-BasicPki {
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/exportCert.sh "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
 
     ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "chmod +x ~/createCerts.sh ~/exportCert.sh"
-    ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./createCerts.sh -risux -c `"$($Context.TunnelFQDN)`" -a `"DNS.1\=$($Context.TunnelFQDN)\nDNS.2\=*.$($Context.TunnelFQDN)\nDNS.3\=trusted\nDNS.4\=webapp\nDNS.5\=excluded\nDNS.6\=cert\nDNS.7\=optionalcert`""
+    
+    if ($Context.WithIPv6) {
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./createCerts.sh -risux -c `"$($Context.TunnelFQDN)`" -a `"DNS.1\=$($Context.TunnelFQDN)\nDNS.2\=*.$($Context.TunnelFQDN)\nDNS.3\=trusted\nDNS.4\=webapp\nDNS.5\=excluded\nDNS.6\=cert\nDNS.7\=optionalcert\nDNS.8\=$($Context.TunnelFQDNIpv6)\nDNS.9\=*.$($Context.TunnelFQDNIpv6)\nIP.1\=$($Context.TunnelGatewayIPv6Address.ipAddress)`""   
+    } else { 
+        ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./createCerts.sh -risux -c `"$($Context.TunnelFQDN)`" -a `"DNS.1\=$($Context.TunnelFQDN)\nDNS.2\=*.$($Context.TunnelFQDN)\nDNS.3\=trusted\nDNS.4\=webapp\nDNS.5\=excluded\nDNS.6\=cert\nDNS.7\=optionalcert`""
+    }
     ssh -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN)" "sudo ./exportCert.sh"
 
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" "$($Context.Username)@$($Context.ServiceFQDN):~/serverchain.pem" ./scripts/serverchain.pem.tmp > $null
