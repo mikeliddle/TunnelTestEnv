@@ -45,6 +45,8 @@ Class TunnelContext {
     [Object] $Group
     [string] $ServiceFQDN
     [string] $TunnelFQDN
+    [string] $ServiceFQDNIpv6
+    [string] $TunnelFQDNIpv6
     [string] $VnetName
     [string] $SubnetName
     [string] $NSGName
