@@ -4,7 +4,7 @@
 
 All DNS entries are stored in the a-records file. You can copy this into the container, or find it in the volume path. e.g. `/var/lib/docker/volumes/unbound/_data/a-records`. After editing this file, you should restart the unbound container to make sure the new entries take effect.
 
-We have added a script to the VM to simplify this process. To add a new DNS entry, simply run `./configureDNS.sh -u -i <ip> -d <domain>`
+We have added a script to the VM to simplify this process. To add a new DNS entry, simply run `./configureDNS.sh -c [-q] -i <ip> -d <domain>`
 
 ## Logs
 
