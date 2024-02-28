@@ -110,7 +110,7 @@ Function New-Network {
         $publicIPv4Name = "ServicePublicIPv4"
         $publicIPv6Name = "ServicePublicIPv6"
         $IPv6ConfigName = "ServiceIPv6Config"
-        $nicName = "$($Context.VmName)-NIC-Service"
+        $nicName = "$($Context.VmName)-NIC-Server"
         az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv4Name --sku Standard --version IPv4 --dns-name "$($Context.VmName)-server" --only-show-errors | Out-Null 
         $Context.TunnelServiceIPv6Address = az network public-ip create --resource-group $Context.ResourceGroup --name $publicIPv6Name --sku Standard --version IPv6 --dns-name "$($Context.VmName)ipv6-service" --only-show-errors | ConvertFrom-Json
         $Context.TunnelServiceIPv6Address = $Context.TunnelServiceIPv6Address.publicIp
@@ -129,7 +129,8 @@ Function Remove-SSHRule {
 
 Function New-TunnelVM {    
     Write-Header "Creating VM '$($Context.VmName)'..."
-    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --nics $Context.TunnelNicName --only-show-errors | Out-Null
+    az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --nics $Context.TunnelNicName --enable-auto-update --patch-mode AutomaticByPlatform --only-show-errors | Out-Null
+    az vm update --name $Context.VmName --resource-group $Context.ResourceGroup --set osProfile.linuxConfiguration.patchSettings.assessmentMode=AutomaticByPlatform # Set the VM to periodically check for updates (once every 24 hours).
 
     if ($Context.BootDiagnostics) {
         Write-Header "Enabling boot diagnostics..."
@@ -137,16 +138,18 @@ Function New-TunnelVM {
     }
 }
 
-Function New-ServiceVM {    
-    Write-Header "Creating VM '$($Context.VmName)-server'..."
+Function New-ServiceVM { 
+    $vmName = "$($Context.VmName)-server"  
+    Write-Header "Creating VM '$vmName'..."
     if ($Context.WithIPv6) {
         # Create a VM with our NIC.
-        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --admin-username $Context.Username --only-show-errors --nics $Context.ServiceNicName | Out-Null
+        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $vmName --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --only-show-errors --admin-username $Context.Username --enable-auto-update --patch-mode AutomaticByPlatform --nics $Context.ServiceNicName  | Out-Null
     } 
     else {
         # Create a VM, and let Azure create a NIC.
-        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name "$($Context.VmName)-server" --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name "$($Context.VmName)-server" --admin-username $Context.Username --vnet-name $Context.VnetName --subnet $Context.SubnetName --only-show-errors | Out-Null
+        az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $vmName --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --only-show-errors --admin-username $Context.Username --enable-auto-update --patch-mode AutomaticByPlatform --public-ip-address-dns-name "$($Context.VmName)-server" --vnet-name $Context.VnetName --subnet $Context.SubnetName | Out-Null
     }
+    az vm update --name $vmName --resource-group $Context.ResourceGroup --set osProfile.linuxConfiguration.patchSettings.assessmentMode=AutomaticByPlatform # Set the VM to periodically check for updates (once every 24 hours).
 }
 
 Function Update-RebootVM {

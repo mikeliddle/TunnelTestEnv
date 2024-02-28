@@ -550,7 +550,9 @@ Function New-Summary {
         }
     }
     if ($Context.WithIPv6) {
+        Write-Success "Tunnel Server IPv6 FQDN: $($script:Context.TunnelFQDNIpv6)"
         Write-Success "Tunnel Server IPv6 address: $($script:Context.TunnelGatewayIPv6Address.ipAddress)"
+        Write-Success "Service Server IPv6 FQDN: $($script:Context.ServiceFQDNIpv6)"
         Write-Success "Service Server IPv6 address: $($script:Context.TunnelServiceIPv6Address.ipAddress)"
         Write-Success ""
     }

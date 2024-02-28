@@ -18,6 +18,7 @@ Function Get-ProxyPrivateIPv6 {
 }
 
 Function Initialize-Proxy {
+    Write-Header "Setting up Squid proxy container..."
     try {
         $configFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "squid.conf"
         $ExcludeDomainFile = Join-Path $pwd -ChildPath "proxy" -AdditionalChildPath "ssl_exclude_domains"
