@@ -20,7 +20,7 @@ Function New-BasicPki {
 }
 
 Function New-NginxSetup {
-    Write-Header "Configuring Nginx..."
+    Write-Header "Configuring Nginx proxy container..."
     $Content = Get-Content ./nginx.conf.d/nginx.conf
     $Content = $Content -replace "##DOMAIN_NAME##", "$($Context.TunnelFQDN)"
     $Content = $Content -replace "##SERVER_NAME##", "$($Context.TunnelFQDN.split('.')[0])"
@@ -48,7 +48,7 @@ Function New-NginxSetup {
 }
 
 Function New-DnsServer {
-    Write-Header "Creating DNS server..."
+    Write-Header "Creating Unbound DNS server container..."
 
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" ./scripts/configureDNS.sh "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
     scp -i $Context.SSHKeyPath -o "StrictHostKeyChecking=no" -r ./unbound.conf.d/a-records.conf "$($Context.Username)@$($Context.ServiceFQDN):~/" > $null
