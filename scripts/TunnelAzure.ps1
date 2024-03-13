@@ -130,7 +130,7 @@ Function Remove-SSHRule {
 Function New-TunnelVM {    
     Write-Header "Creating VM '$($Context.VmName)'..."
     az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $Context.VmName --image $Context.Image --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --public-ip-address-dns-name $Context.VmName --admin-username $Context.Username --nics $Context.TunnelNicName --enable-auto-update --patch-mode AutomaticByPlatform --only-show-errors | Out-Null
-    az vm update --name $Context.VmName --resource-group $Context.ResourceGroup --set osProfile.linuxConfiguration.patchSettings.assessmentMode=AutomaticByPlatform # Set the VM to periodically check for updates (once every 24 hours).
+    Update-GeneralVMProperties -vmName $vmName
 
     if ($Context.BootDiagnostics) {
         Write-Header "Enabling boot diagnostics..."
@@ -149,7 +149,13 @@ Function New-ServiceVM {
         # Create a VM, and let Azure create a NIC.
         az vm create --location $Context.Location --resource-group $Context.ResourceGroup --name $vmName --image $([Constants]::ServerVMImage) --size $Context.Size --ssh-key-values "$($Context.SSHKeyPath).pub" --only-show-errors --admin-username $Context.Username --enable-auto-update --patch-mode AutomaticByPlatform --public-ip-address-dns-name "$($Context.VmName)-server" --vnet-name $Context.VnetName --subnet $Context.SubnetName | Out-Null
     }
+    Update-GeneralVMProperties -vmName $vmName
+}
+
+Function Update-GeneralVMProperties([string] $vmName) {
+    Write-Information "Updating general properties for '$vmName'..."
     az vm update --name $vmName --resource-group $Context.ResourceGroup --set osProfile.linuxConfiguration.patchSettings.assessmentMode=AutomaticByPlatform # Set the VM to periodically check for updates (once every 24 hours).
+    az vm update --name $Context.VmName --resource-group $Context.ResourceGroup --set tags.AzSecPackAutoConfigReady=true # Enable AzSecPack
 }
 
 Function Update-RebootVM {
